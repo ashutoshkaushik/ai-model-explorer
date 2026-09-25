@@ -1,0 +1,17 @@
+date,title,description
+1958-07-08,Perceptron,"Frank Rosenblatt demonstrates the perceptron, an early trainable neural network, at the U.S. Navy."
+1986-10-09,Backpropagation,"Rumelhart, Hinton and Williams publish 'Learning representations by back-propagating errors' in Nature."
+1997-05-11,Deep Blue,IBM's Deep Blue defeats world chess champion Garry Kasparov in a six-game match.
+2012-09-30,AlexNet,AlexNet wins ImageNet (ILSVRC 2012) by a wide margin using GPUs and deep convolutional networks.
+2014-06-10,GANs,Ian Goodfellow et al. introduce generative adversarial networks.
+2016-03-15,AlphaGo,DeepMind's AlphaGo defeats Lee Sedol 4–1 at Go.
+2017-06-12,Transformer,'Attention Is All You Need' introduces the Transformer architecture.
+2018-10-11,BERT,Google's BERT popularizes large-scale pretraining + fine-tuning for language.
+2020-05-28,GPT-3,OpenAI's 175B-parameter GPT-3 shows few-shot learning emerging from scale.
+2020-11-30,AlphaFold 2,AlphaFold 2 effectively solves protein structure prediction at CASP14.
+2022-11-30,ChatGPT,"OpenAI releases ChatGPT, bringing LLM chat assistants to the mainstream."
+2023-03-14,GPT-4,"OpenAI releases GPT-4, a multimodal frontier model."
+2024-09-12,o1 reasoning,"OpenAI previews o1, popularizing models trained to reason with long chains of thought."
+2025-01-20,DeepSeek-R1,"DeepSeek releases R1, an open-weight reasoning model rivaling frontier systems at far lower reported cost."
+2025-08-07,GPT-5,OpenAI releases GPT-5.
+2026-09-03,10²⁷ FLOP crossed,GPT-6 Astra becomes the first model in the dataset trained with ~10²⁷ FLOP.

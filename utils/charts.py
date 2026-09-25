@@ -100,10 +100,66 @@ def fit_growth(df: pd.DataFrame, value_col: str, start_year: int = 2010) -> Grow
 # --- Compute over time -----------------------------------------------------------------------
 
 
-def over_time_scatter(df: pd.DataFrame, metric: str, fit: GrowthFit | None, domains: list[str]) -> go.Figure:
-    """Log-scale scatter of the chosen metric over time, colored by primary domain.
+ERAS = [
+    ("Pre-Deep<br>Learning", None, "2010-01-01", "rgba(255,255,255,0.0)"),
+    ("Deep<br>Learning", "2010-01-01", "2018-01-01", "rgba(255,255,255,0.035)"),
+    ("Large-Scale<br>/ LLM Era", "2018-01-01", None, "rgba(255,255,255,0.07)"),
+]
+
+
+def add_eras(fig: go.Figure, x_min: pd.Timestamp, x_max: pd.Timestamp) -> None:
+    """Shade the three eras (clipped to the visible date range) and label each at the bottom."""
+    for name, start, end, fill in ERAS:
+        x0 = max(pd.Timestamp(start), x_min) if start else x_min
+        x1 = min(pd.Timestamp(end), x_max) if end else x_max
+        if x0 >= x1:
+            continue
+        fig.add_vrect(x0=x0, x1=x1, fillcolor=fill, line_width=0, layer="below")
+        fig.add_annotation(
+            x=x0, y=0, xref="x", yref="paper", text=name, showarrow=False,
+            xanchor="left", yanchor="bottom", xshift=4, yshift=4, align="left",
+            font=dict(size=11, color=TEXT_MUTED),
+        )
+
+
+def add_milestones(fig: go.Figure, milestones: pd.DataFrame, x_min: pd.Timestamp, x_max: pd.Timestamp) -> None:
+    """Dashed vertical line per milestone, with a hoverable marker on top of each line.
+
+    Rotated text labels are drawn only where they won't collide with the previous label;
+    crowded milestones remain identifiable via hover.
+    """
+    m = milestones[milestones["date"].between(x_min, x_max)]
+    min_gap = (x_max - x_min) * 0.028
+    last_labeled = None
+    for _, row in m.iterrows():
+        fig.add_shape(
+            type="line", x0=row["date"], x1=row["date"], y0=0, y1=1, xref="x", yref="paper",
+            line=dict(color="rgba(255,255,255,0.35)", width=1, dash="dash"), layer="below",
+        )
+        roomy = last_labeled is None or row["date"] - last_labeled >= min_gap
+        fig.add_annotation(
+            x=row["date"], y=1, xref="x", yref="paper", yanchor="top",
+            text=row["title"] if roomy else "◆", textangle=-90 if roomy else 0,
+            showarrow=False, xshift=-7 if roomy else 0,
+            font=dict(size=10, color="#ffffff" if roomy else TEXT_MUTED),
+            bgcolor="rgba(26,26,25,0.75)" if roomy else None,
+            hovertext=f"<b>{row['title']}</b> ({row['date']:%b %Y})<br>{row['description']}",
+        )
+        if roomy:
+            last_labeled = row["date"]
+
+
+def over_time_scatter(
+    df: pd.DataFrame,
+    metric: str,
+    fit: GrowthFit | None,
+    domains: list[str],
+    milestones: pd.DataFrame | None = None,
+) -> go.Figure:
+    """Log-scale scatter of the chosen metric over time, colored by primary domain, with era shading.
 
     `domains` is the fixed ordered list of domains that get their own color; others fold into "Other".
+    Pass `milestones` (date/title/description) to overlay them as dashed vertical lines.
     """
     cfg = METRICS[metric]
     col = cfg["col"]
@@ -162,8 +218,14 @@ def over_time_scatter(df: pd.DataFrame, metric: str, fit: GrowthFit | None, doma
 
     fig.update_yaxes(type="log", title=f"{metric} ({cfg['unit']}, log scale)", exponentformat="power")
     fig.update_xaxes(title="Publication date")
+    pad = pd.Timedelta(days=365)
+    x_min, x_max = d[DATE_COL].min() - pad, d[DATE_COL].max() + pad
+    add_eras(fig, x_min, x_max)
+    if milestones is not None:
+        add_milestones(fig, milestones, x_min, x_max)
+    fig.update_xaxes(range=[x_min, x_max])
     fig.update_layout(legend=dict(itemsizing="constant"))
-    return _base_layout(fig, height=560)
+    return _base_layout(fig, height=600)
 
 
 # --- Breakdown charts ------------------------------------------------------------------------
@@ -260,3 +322,24 @@ def open_share_line(df: pd.DataFrame, min_models: int = 5) -> go.Figure | None:
     fig.update_yaxes(title="Open-weight share", tickformat=".0%", range=[0, 1.05])
     fig.update_xaxes(title=None)
     return _base_layout(fig, "Open-weight share over time", height=380)
+
+
+# --- Frontier leaderboard --------------------------------------------------------------------
+
+
+def leaderboard_step(top: pd.DataFrame) -> go.Figure:
+    """Step chart of the highest training compute per year (log scale)."""
+    fig = go.Figure(
+        go.Scatter(
+            x=top["year"],
+            y=top[COMPUTE_COL],
+            mode="lines+markers",
+            line=dict(color=PALETTE[0], width=2, shape="hv"),
+            marker=dict(size=8, line=dict(width=2, color="#1a1a19")),
+            customdata=np.stack([top[MODEL_COL], top["primary_org"]], axis=-1),
+            hovertemplate="<b>%{x}: %{customdata[0]}</b><br>%{customdata[1]}<br>%{y:.2e} FLOP<extra></extra>",
+        )
+    )
+    fig.update_yaxes(type="log", title="Training compute (FLOP, log scale)", exponentformat="power")
+    fig.update_xaxes(title=None)
+    return _base_layout(fig, "Highest training compute per year", height=440)

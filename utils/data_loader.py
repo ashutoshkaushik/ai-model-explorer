@@ -7,6 +7,7 @@ import streamlit as st
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_PATH = DATA_DIR / "notable_ai_models.csv"
+MILESTONES_PATH = DATA_DIR / "milestones.csv"
 
 MODEL_COL = "Model"
 DATE_COL = "Publication date"
@@ -76,3 +77,27 @@ def apply_filters(
     if frontier_only:
         mask &= df[FRONTIER_COL]
     return df[mask]
+
+
+@st.cache_data
+def load_milestones() -> pd.DataFrame:
+    m = pd.read_csv(MILESTONES_PATH, parse_dates=["date"])
+    return m.sort_values("date").reset_index(drop=True)
+
+
+def models_near(df: pd.DataFrame, date: pd.Timestamp, months: int = 6, n: int = 3) -> pd.DataFrame:
+    """Top-n models by training compute published within ±months of date."""
+    window = df[
+        df[DATE_COL].between(date - pd.DateOffset(months=months), date + pd.DateOffset(months=months))
+        & df[COMPUTE_COL].notna()
+    ]
+    return window.nlargest(n, COMPUTE_COL)
+
+
+def frontier_by_year(df: pd.DataFrame) -> pd.DataFrame:
+    """The single highest-compute model for each year, with growth vs. the previous listed year."""
+    known = df[df[COMPUTE_COL].notna()]
+    if known.empty:
+        return known.assign(growth=pd.Series(dtype=float))
+    top = known.loc[known.groupby("year")[COMPUTE_COL].idxmax()].sort_values("year")
+    return top.assign(growth=top[COMPUTE_COL] / top[COMPUTE_COL].shift())
