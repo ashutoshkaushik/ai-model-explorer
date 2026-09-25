@@ -46,3 +46,33 @@ def load_data() -> pd.DataFrame:
     df[FRONTIER_COL] = df[FRONTIER_COL].astype("string").str.lower().eq("true").fillna(False).astype(bool)
     df["open_status"] = _open_status(df[ACCESS_COL])
     return df.sort_values(DATE_COL, ascending=False).reset_index(drop=True)
+
+
+def top_orgs(df: pd.DataFrame, n: int = 15) -> list[str]:
+    counts = df.loc[df["primary_org"] != "Unknown", "primary_org"].value_counts()
+    return counts.index[:n].tolist()
+
+
+def apply_filters(
+    df: pd.DataFrame,
+    years: tuple[int, int],
+    domains: list[str],
+    orgs: list[str],
+    org_options: list[str],
+    access: list[str],
+    frontier_only: bool,
+) -> pd.DataFrame:
+    """Empty selection lists mean 'no filter'. 'Other' in orgs matches every org outside org_options."""
+    mask = df["year"].between(*years)
+    if domains:
+        mask &= df["primary_domain"].isin(domains)
+    if orgs:
+        org_mask = df["primary_org"].isin(orgs)
+        if "Other" in orgs:
+            org_mask |= ~df["primary_org"].isin(org_options)
+        mask &= org_mask
+    if access:
+        mask &= df[ACCESS_COL].fillna("Unknown").isin(access)
+    if frontier_only:
+        mask &= df[FRONTIER_COL]
+    return df[mask]

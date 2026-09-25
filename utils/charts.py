@@ -122,7 +122,7 @@ def over_time_scatter(df: pd.DataFrame, metric: str, fit: GrowthFit | None, doma
         if s.empty:
             continue
         fig.add_trace(
-            go.Scattergl(
+            go.Scatter(
                 x=s[DATE_COL],
                 y=s[col],
                 mode="markers",
@@ -155,11 +155,108 @@ def over_time_scatter(df: pd.DataFrame, metric: str, fit: GrowthFit | None, doma
                 y=ys,
                 mode="lines",
                 name=f"Trend since {fit.start_year} (~{fit.factor_per_year:.1f}×/yr)",
-                line=dict(color="#ffffff", width=2, dash="dot"),
+                line=dict(color="#ffffff", width=2.5, dash="dash"),
                 hoverinfo="skip",
             )
         )
 
     fig.update_yaxes(type="log", title=f"{metric} ({cfg['unit']}, log scale)", exponentformat="power")
     fig.update_xaxes(title="Publication date")
+    fig.update_layout(legend=dict(itemsizing="constant"))
     return _base_layout(fig, height=560)
+
+
+# --- Breakdown charts ------------------------------------------------------------------------
+
+OPEN_COLORS = {"Open": PALETTE[0], "Closed": PALETTE[1], "Unknown": OTHER_COLOR}
+
+
+def top_orgs_bar(df: pd.DataFrame, n: int = 10) -> go.Figure:
+    counts = df.loc[df["primary_org"] != "Unknown", "primary_org"].value_counts().head(n)[::-1]
+    fig = go.Figure(
+        go.Bar(
+            x=counts.values,
+            y=counts.index,
+            orientation="h",
+            marker=dict(color=PALETTE[0], cornerradius=4),
+            text=counts.values,
+            textposition="outside",
+            textfont=dict(color=TEXT_MUTED),
+            cliponaxis=False,
+            hovertemplate="<b>%{y}</b><br>%{x} models<extra></extra>",
+        )
+    )
+    fig.update_xaxes(title="Models", showgrid=False, showticklabels=False)
+    fig.update_yaxes(title=None)
+    return _base_layout(fig, f"Top {len(counts)} organizations by model count", height=400)
+
+
+def domain_area(df: pd.DataFrame, domains: list[str]) -> go.Figure:
+    d = df.assign(domain=fold_other(df["primary_domain"], domains))
+    counts = d.groupby(["year", "domain"]).size().unstack(fill_value=0)
+    counts = counts.reindex(range(counts.index.min(), counts.index.max() + 1), fill_value=0)
+    colors = color_map(domains + ["Other"])
+    fig = go.Figure()
+    for dom in domains + ["Other"]:
+        if dom not in counts:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=counts.index,
+                y=counts[dom],
+                name=dom,
+                stackgroup="one",
+                mode="lines",
+                line=dict(width=0.5, color=colors[dom]),
+                fillcolor=colors[dom],
+                hovertemplate=f"{dom}: %{{y}}<extra></extra>",
+            )
+        )
+    fig.update_layout(hovermode="x unified")
+    fig.update_xaxes(title=None)
+    fig.update_yaxes(title="Models per year")
+    return _base_layout(fig, "Models per year by domain", height=400)
+
+
+def open_donut(df: pd.DataFrame) -> go.Figure:
+    counts = df["open_status"].value_counts().reindex(["Open", "Closed", "Unknown"]).dropna()
+    fig = go.Figure(
+        go.Pie(
+            labels=counts.index,
+            values=counts.values,
+            hole=0.6,
+            sort=False,
+            marker=dict(colors=[OPEN_COLORS[k] for k in counts.index], line=dict(color="#1a1a19", width=2)),
+            textinfo="label+percent",
+            hovertemplate="<b>%{label}</b><br>%{value} models (%{percent})<extra></extra>",
+        )
+    )
+    fig.update_layout(showlegend=False)
+    return _base_layout(fig, "Open vs. closed weights", height=380)
+
+
+def open_share_line(df: pd.DataFrame, min_models: int = 5) -> go.Figure | None:
+    """Share of open-weight models per year, among models with known accessibility.
+
+    Years with fewer than `min_models` known models are dropped to avoid noisy 0%/100% spikes.
+    """
+    known = df[df["open_status"] != "Unknown"]
+    by_year = known.groupby("year")["open_status"].agg(total="size", open=lambda s: (s == "Open").sum())
+    by_year = by_year[by_year["total"] >= min_models]
+    if by_year.empty:
+        return None
+    share = by_year["open"] / by_year["total"]
+    fig = go.Figure(
+        go.Scatter(
+            x=share.index,
+            y=share.values,
+            mode="lines+markers",
+            line=dict(color=PALETTE[0], width=2),
+            marker=dict(size=8, line=dict(width=2, color="#1a1a19")),
+            customdata=np.stack([by_year["open"], by_year["total"]], axis=-1),
+            hovertemplate="%{x}: %{y:.0%} open (%{customdata[0]} of %{customdata[1]})<extra></extra>",
+        )
+    )
+    fig.update_yaxes(title="Open-weight share", tickformat=".0%", range=[0, 1.05])
+    fig.update_xaxes(title=None)
+    return _base_layout(fig, "Open-weight share over time", height=380)
