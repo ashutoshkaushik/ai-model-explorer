@@ -3,6 +3,7 @@ import math
 import pandas as pd
 import streamlit as st
 
+from utils.charts import METRICS, fit_growth, over_time_scatter, top_categories
 from utils.data_loader import (
     ACCESS_COL,
     COMPUTE_COL,
@@ -41,6 +42,25 @@ k4.metric(
     help=f"{biggest[MODEL_COL]} ({biggest['primary_org']}, {biggest[DATE_COL]:%b %Y})",
     border=True,
 )
+
+# --- Compute over time ---
+st.subheader("Compute Over Time")
+metric = st.radio("Y-axis metric", list(METRICS), horizontal=True)
+metric_col = METRICS[metric]["col"]
+plotted = df[df[metric_col] > 0]
+excluded = len(df) - len(plotted)
+fit = fit_growth(plotted, metric_col)
+domains = top_categories(df["primary_domain"])
+if plotted.empty:
+    st.info("No models with this metric match the current selection.")
+else:
+    if fit:
+        st.info(
+            f"**{METRICS[metric]['noun']} ~{fit.factor_per_year:.1f}× per year** "
+            f"(log-linear fit over {fit.n:,} models published since {fit.start_year})."
+        )
+    st.plotly_chart(over_time_scatter(plotted, metric, fit, domains), width="stretch")
+    st.caption(f"{excluded:,} models excluded (missing data). Marker size ∝ log(parameters).")
 
 # --- Searchable table ---
 st.subheader("Browse models")
