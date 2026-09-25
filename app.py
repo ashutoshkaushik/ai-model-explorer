@@ -112,8 +112,8 @@ if df[COMPUTE_COL].notna().any():
     biggest = df.loc[df[COMPUTE_COL].idxmax()]
     k4.metric(
         "Largest training compute",
-        f"{sci(biggest[COMPUTE_COL])} FLOP",
-        help=f"{biggest[MODEL_COL]} ({biggest['primary_org']}, {biggest[DATE_COL]:%b %Y})",
+        sci(biggest[COMPUTE_COL]),
+        help=f"FLOP · {biggest[MODEL_COL]} ({biggest['primary_org']}, {biggest[DATE_COL]:%b %Y})",
         border=True,
     )
 else:
@@ -167,6 +167,13 @@ with tab_overview:
 
     # --- Searchable table ---
     st.subheader("Browse models")
+    st.download_button(
+        f"Download filtered data ({len(df):,} rows, CSV)",
+        df.drop(columns=["year"]).to_csv(index=False).encode("utf-8"),
+        file_name="notable_ai_models_filtered.csv",
+        mime="text/csv",
+        icon=":material/download:",
+    )
     query = st.text_input("Search", placeholder="Model, organization, or domain…")
     table = df[[MODEL_COL, "primary_org", "primary_domain", DATE_COL, PARAMS_COL, COMPUTE_COL, COST_COL, ACCESS_COL]]
     if query:
@@ -181,8 +188,8 @@ with tab_overview:
             "primary_org": "Organization",
             "primary_domain": "Domain",
             DATE_COL: st.column_config.DateColumn("Published", format="YYYY-MM-DD"),
-            PARAMS_COL: st.column_config.NumberColumn("Parameters", format="%.2e"),
-            COMPUTE_COL: st.column_config.NumberColumn("Compute (FLOP)", format="%.2e"),
+            PARAMS_COL: st.column_config.NumberColumn("Parameters", format="scientific"),
+            COMPUTE_COL: st.column_config.NumberColumn("Compute (FLOP)", format="scientific"),
             COST_COL: st.column_config.NumberColumn("Cost (2023 USD)", format="dollar"),
             ACCESS_COL: "Accessibility",
         },
@@ -221,7 +228,8 @@ with tab_leaderboard:
     else:
         st.plotly_chart(leaderboard_step(top), width="stretch")
         st.dataframe(
-            top.sort_values("year", ascending=False)[
+            top.sort_values("year", ascending=False)
+            .assign(**{COMPUTE_COL: lambda t: t[COMPUTE_COL].map("{:.2e}".format)})[
                 ["year", MODEL_COL, "primary_org", "primary_domain", COMPUTE_COL, "growth"]
             ],
             hide_index=True,
@@ -230,7 +238,7 @@ with tab_leaderboard:
                 "year": st.column_config.NumberColumn("Year", format="%d"),
                 "primary_org": "Organization",
                 "primary_domain": "Domain",
-                COMPUTE_COL: st.column_config.NumberColumn("Compute (FLOP)", format="%.2e"),
+                COMPUTE_COL: "Compute (FLOP)",
                 "growth": st.column_config.NumberColumn(
                     "× previous year's top", format="%.1f×", help="Ratio to the top model of the previous listed year"
                 ),
@@ -263,9 +271,10 @@ with tab_ask:
             "to enable questions and era summaries."
         )
     else:
-        ex_cols = st.columns(len(EXAMPLE_QUESTIONS))
-        for col, q in zip(ex_cols, EXAMPLE_QUESTIONS):
-            col.button(q, on_click=set_question, args=(q,), width="stretch")
+        st.caption("Try an example:")
+        ex_cols = st.columns(2)
+        for i, q in enumerate(EXAMPLE_QUESTIONS):
+            ex_cols[i % 2].button(q, on_click=set_question, args=(q,), width="stretch")
         with st.form("ask_form", border=False):
             question = st.text_input("Your question", key="ask_q", placeholder="e.g. Which domain grew fastest after 2020?")
             submitted = st.form_submit_button("Ask", type="primary")

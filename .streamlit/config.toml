@@ -1,6 +1,18 @@
+# Dark theme matched to the chart palette in utils/charts.py (surface #1a1a19, series blue #3987e5).
 [theme]
 base = "dark"
-primaryColor = "#7C83FD"
+primaryColor = "#3987e5"
+backgroundColor = "#1a1a19"
+secondaryBackgroundColor = "#262624"
+textColor = "#f4f3ee"
+borderColor = "#3a3a37"
+font = "sans-serif"
 
 [server]
 headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"

@@ -30,11 +30,24 @@ Other useful columns: `Model`, `Task`, `Organization categorization` (Industry/A
 
 `utils/data_loader.py` exposes these as constants (`DATE_COL`, `ORG_COL`, `DOMAIN_COL`, `PARAMS_COL`, `COMPUTE_COL`, `COST_COL`, `ACCESS_COL`, `FRONTIER_COL`); use them instead of retyping strings.
 
+Derived columns added by `load_data()`: `year` (int), `primary_org` / `primary_domain` (first value of the comma-separated field, `Unknown` if missing), `open_status` (`Open` = any "Open weights…" accessibility, `Closed`, `Unknown`), and `Frontier model` as bool.
+
+`data/milestones.csv` (date, title, description) is curated by hand; quote any field containing commas.
+
+## Tests
+```bash
+python tests/test_growth.py   # growth-rate fit
+python tests/test_llm.py      # query functions + tool-use loop (fake client, no API calls)
+```
+
 ## Conventions
 - Plotly (`plotly.express` / `graph_objects`) for all charts.
 - All chart functions live in `utils/charts.py`; they take a DataFrame and return a `go.Figure`. `app.py` only lays out UI.
 - Data loading goes through `@st.cache_data` functions in `utils/data_loader.py`.
 - Split comma-separated multi-value columns (`str.split(",")` + `explode`) before grouping by org/domain.
 - Never hardcode API keys. Read `ANTHROPIC_API_KEY` from `st.secrets` (`.streamlit/secrets.toml`, gitignored) or the environment; see `utils/llm.py`.
+- Never execute LLM-generated code. Ask the Data only dispatches to the functions registered in `utils/llm.QUERIES`; add new capabilities there.
+- Every chart, table, and LLM call uses the sidebar-filtered `df`. Handle empty results with a friendly message.
+- Chart colors: use `PALETTE` / `color_map` in `utils/charts.py` (fixed order, validated palette). Assign domain colors from the unfiltered data so filters never repaint a series; fold beyond 7 series into gray "Other".
 - Every page/chart area credits: **"Data: Epoch AI (CC-BY 4.0)"**.
 - Dependencies are pinned in `requirements.txt`.
