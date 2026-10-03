@@ -2,7 +2,7 @@
 
     streamlit run app.py
 
-Structure: pages are registered with st.navigation below, in three groups (App, Overview, Explorer Lab),
+Structure: pages are registered with st.navigation below, in four groups (App, Overview, Explorer Lab, Surprise me),
 the same layout as the AI History RAG and Travel Agent Lab projects. Data logic lives in utils/; the
 page modules in lab/ only lay out UI.
 """
@@ -14,6 +14,7 @@ from lab.home import home_page
 from lab.lab_pages import LAB_PAGES
 from lab.nav import PAGES, TOUR
 from lab.overview import about_page, browse_page, leaderboard_page, timeline_page
+from lab.surprise import surprise_page
 from ui import chrome, filters, theme
 
 
@@ -30,6 +31,8 @@ def main() -> None:
                                url_path="leaderboard"),
         "browse": st.Page(browse_page, title="Browse the data", icon=":material/table_view:", url_path="browse"),
         "about": st.Page(about_page, title="How it's built", icon=":material/account_tree:", url_path="about"),
+        "surprise": st.Page(surprise_page, title="An AI fact you didn't know", icon=":material/auto_awesome:",
+                            url_path="surprise"),
     }
     for key, (title, icon, fn) in LAB_PAGES.items():
         pages[key] = st.Page(fn, title=title, icon=icon, url_path=key.replace("_", "-"))
@@ -38,6 +41,7 @@ def main() -> None:
         "App": [pages["home"], pages["explorer"], pages["ask"]],
         "Overview": [pages["timeline"], pages["leaderboard"], pages["browse"], pages["about"]],
         "Explorer Lab · built step by step": [pages[k] for k in TOUR],
+        "Surprise me": [pages["surprise"]],
     }, expanded=True)  # always show every page; no "View more" in the sidebar
     page.run()
     chrome.author_card()

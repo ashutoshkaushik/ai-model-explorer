@@ -38,12 +38,13 @@ Derived columns added by `load_data()`: `year` (int), `primary_org` / `primary_d
 ```bash
 python tests/test_growth.py   # growth-rate fit
 python tests/test_llm.py      # query functions + tool-use loop (fake client, no API calls)
+python tests/test_surprise.py # the 25 static facts
 ```
 
 ## Conventions
 - Plotly (`plotly.express` / `graph_objects`) for all charts.
 - All chart functions live in `utils/charts.py`; they take a DataFrame and return a `go.Figure`.
-- App structure (same as the AI History RAG and Travel Agent Lab projects): `app.py` only registers pages with `st.navigation` in three groups: **App** (`lab/home.py`, `lab/app_pages.py`), **Overview** (`lab/overview.py`), **Explorer Lab** (`lab/lab_pages.py`, order in `lab/nav.TOUR`). `ui/chrome.py` adds the author card + LinkedIn link at the sidebar bottom and the footer on every page.
+- App structure (same as the AI History RAG and Travel Agent Lab projects): `app.py` only registers pages with `st.navigation` in four groups: **App** (`lab/home.py`, `lab/app_pages.py`), **Overview** (`lab/overview.py`), **Explorer Lab** (`lab/lab_pages.py`, order in `lab/nav.TOUR`), **Surprise me** (`lab/surprise.py`, 25 static facts; never generate them at run time). `ui/chrome.py` adds the author card + LinkedIn link at the sidebar bottom and the footer on every page.
 - Theme: `.streamlit/config.toml` (Claude-style light + dark, terracotta accent, Source Serif 4 headings, Hanken Grotesk body) and `ui/theme.py` (CSS tokens + shared classes: `hero`, `lede`, `eyebrow`, `badge`, `steps`, `ladder`, `learnbox`, `ltable`). Never hard-code colours in pages.
 - Data pages call `ui.filters.sidebar_filters()` to draw the shared sidebar filters and get the filtered `df`; filter values persist across pages via `filters.keep_state()`.
 - Data loading goes through `@st.cache_data` functions in `utils/data_loader.py`.

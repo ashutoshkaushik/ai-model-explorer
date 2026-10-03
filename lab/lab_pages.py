@@ -69,6 +69,103 @@ def learn(goals: list[str], insights: list[str], qa: list[tuple[str, str]]) -> N
             st.markdown(a)
 
 
+def nuggets(key: str) -> None:
+    """'Knowledge nuggets': short, general facts around this step, as a grid of cards at the bottom of the page."""
+    st.markdown("### Knowledge nuggets")
+    cards = "".join(f"<div class='nugget'><div class='tag'>{tag}</div><b>{title}</b><span>{body}</span></div>"
+                    for tag, title, body in NUGGETS[key])
+    st.markdown(f"<div class='nuggets'>{cards}</div>", unsafe_allow_html=True)
+
+
+NUGGETS = {  # key: [(tag, headline, body)], 4 per Lab page
+    "lab_data": [
+        ("Data", "Tidy data has one rule per cell",
+         "Hadley Wickham's 2014 \"Tidy Data\" paper: each variable is a column, each observation a row, each value a "
+         "cell. A field like \"Meta AI,NYU\" breaks that rule, which is why it needs a decision before grouping."),
+        ("pandas", "explode() is the other option",
+         "<code>df.assign(org=df.Organization.str.split(\",\")).explode(\"org\")</code> gives one row per partner. Use it "
+         "to credit every co-author lab; use the first value when totals must add up to the model count."),
+        ("Bias", "Missing is not random",
+         "Big, famous models are far more likely to report compute and cost. So an average over the known values skews "
+         "high: it describes the documented models, not all models."),
+        ("Streamlit", "Caching survives reruns, not restarts",
+         "<code>@st.cache_data</code> keys the result on the function's code and arguments, and hands each caller a "
+         "copy, so one page can't mutate another page's DataFrame."),
+    ],
+    "lab_log": [
+        ("Scale", "10²⁵ FLOP, made tangible",
+         "A GPU sustaining 10¹⁵ operations per second (one petaFLOP/s) would need about 10¹⁰ seconds, roughly 300 "
+         "years, to do 10²⁵ operations alone. Frontier labs do it in months on tens of thousands of chips."),
+        ("Reading", "Each gridline is ×10",
+         "On a log axis, equal distances mean equal ratios. Going from 10²⁰ to 10²⁴ is not \"4 more\" but 10,000 "
+         "times more."),
+        ("Pitfall", "log(0) doesn't exist",
+         "Zeros and negatives can't sit on a log axis; plotting libraries silently drop them. That's why the charts "
+         "filter to values above zero and say how many models were left out."),
+        ("Design", "Tufte's lie factor",
+         "Edward Tufte: the size of an effect in the graphic should match its size in the data. A marker whose radius "
+         "grew with raw parameters would make one trillion-parameter model swallow the chart."),
+    ],
+    "lab_growth": [
+        ("Math", "Doubling time from growth rate",
+         "Doubling time = ln 2 ÷ ln(growth per year). At 4.3× per year that's about 5.7 months; Moore's law "
+         "(2× every ~2 years) is about 1.4× per year."),
+        ("Context", "Epoch AI's own estimate",
+         "Epoch AI estimates training compute for notable models has grown roughly 4–5× per year since 2010, in line "
+         "with the fit on this page."),
+        ("Statistics", "A log fit is a geometric fit",
+         "Least squares on log10(value) assumes errors are multiplicative (\"off by 2×\"), not additive (\"off by 10¹⁸ "
+         "FLOP\"). For quantities that span orders of magnitude, that's the right assumption."),
+        ("Caution", "Trends are not forecasts",
+         "Extrapolating 4× per year for another decade means 10⁶× more compute. Power, chips, data and money all "
+         "push back; a fit describes the past, not a law of nature."),
+    ],
+    "lab_filters": [
+        ("Accessibility", "1 in 12 men see colour differently",
+         "About 8% of men and 0.5% of women of Northern European descent have red-green colour vision deficiency. "
+         "Validated palettes keep neighbouring series distinguishable for them."),
+        ("Perception", "Position beats colour",
+         "Cleveland and McGill (1984) found position on a common scale is the most accurately read encoding; colour "
+         "hue is best for telling categories apart, not for comparing amounts."),
+        ("Design", "Seven is plenty",
+         "Beyond about seven categorical colours, readers start confusing series. Folding the long tail into a gray "
+         "\"Other\" keeps the important ones legible."),
+        ("Streamlit", "The whole script reruns on every click",
+         "Every widget change reruns the page from the top. <code>st.session_state</code> is what survives, which is "
+         "how these filters follow you from page to page."),
+    ],
+    "lab_milestones": [
+        ("History", "Three eras, from a 2022 paper",
+         "Sevilla et al., \"Compute Trends Across Three Eras of Machine Learning\", split history into pre-deep "
+         "learning, deep learning (from 2010) and a large-scale era from late 2015. This app starts that band at 2018 "
+         "for a cleaner picture."),
+        ("Design", "Label directly when you can",
+         "A label next to the thing it names saves a trip to the legend. When labels would collide, keep the "
+         "important ones and move the rest to hover."),
+        ("Charts", "Step lines for records",
+         "A step chart (<code>shape=\"hv\"</code>) says \"this value held until the next change\". A sloped line "
+         "between yearly records would imply models in between that never existed."),
+        ("pandas", "idxmax() picks the first tie",
+         "If two models share a year's top compute, <code>idxmax</code> returns the first one it meets. The loader "
+         "sorts newest first, so ties go to the later model."),
+    ],
+    "lab_tools": [
+        ("Concept", "Tool use is structured output",
+         "The model never runs anything. It emits a block naming a tool and JSON arguments; your code decides "
+         "whether and how to run it, and sends the result back."),
+        ("Security", "Prompt injection is the top LLM risk",
+         "OWASP's Top 10 for LLM applications lists prompt injection first. A fixed registry of read-only functions "
+         "limits what any injected instruction could make the app do."),
+        ("JSON Schema", "additionalProperties: false",
+         "Every tool schema here forbids unknown keys, and <code>run_query</code> drops them anyway. Two layers, "
+         "because a schema is a request to the model, not a guarantee."),
+        ("Prompting", "Descriptions are prompts",
+         "Claude picks tools by reading their names and descriptions. Short, specific descriptions with an example "
+         "(\"e.g. 'GPT-4'\") choose better than long ones."),
+    ],
+}
+
+
 # --- 1 · Load and clean --------------------------------------------------------------------------
 
 
@@ -106,6 +203,7 @@ def lab_data() -> None:
           "Different pages need different columns: a model without compute still counts on the organization and "
           "domain charts. Each chart filters for what it needs.")],
     )
+    nuggets("lab_data")
     tour_footer("lab_data")
 
 
@@ -135,6 +233,7 @@ def lab_log() -> None:
          "without hiding everything else."],
         [("Why `exponentformat=\"power\"`?", "Ticks read 10²⁴ instead of 1e+24 or 1,000,000,000,000,000,000,000,000.")],
     )
+    nuggets("lab_log")
     tour_footer("lab_log")
 
 
@@ -168,6 +267,7 @@ def lab_growth() -> None:
           "Before deep learning, compute grew far more slowly; one line over both eras fits neither. The Explorer's "
           "shaded eras show the break.")],
     )
+    nuggets("lab_growth")
     tour_footer("lab_growth")
 
 
@@ -206,6 +306,7 @@ def lab_filters() -> None:
           "The filter lists the top 15 organizations; 'Other' matches everyone else, so you can still select the "
           "long tail.")],
     )
+    nuggets("lab_filters")
     tour_footer("lab_filters")
 
 
@@ -233,6 +334,7 @@ def lab_milestones() -> None:
         [("Why are milestones a CSV and not code?",
           "They're editorial content. Anyone can add a row without touching the chart code.")],
     )
+    nuggets("lab_milestones")
     tour_footer("lab_milestones")
 
 
@@ -287,6 +389,7 @@ def lab_tools() -> None:
           "Executing model-written code means anything in a prompt can become code on your server. Nine functions "
           "cover the questions people actually ask; new capabilities are added to `QUERIES` deliberately.")],
     )
+    nuggets("lab_tools")
     tour_footer("lab_tools")
 
 

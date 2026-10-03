@@ -130,6 +130,30 @@ def apply_theme() -> None:
                background: var(--card); padding: .7rem 1rem .4rem; margin: .8rem 0 .6rem; max-width: 72ch; }}
   .learnbox ul {{ margin: .35rem 0 .3rem 1.1rem; padding: 0; }}
   .learnbox li {{ margin: .15rem 0; }}
+  .nuggets {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: .4rem 0 1rem; }}
+  @media (max-width: 900px) {{ .nuggets {{ grid-template-columns: 1fr; }} }}
+  .nugget {{ border: 1px solid var(--line); border-radius: .6rem; background: var(--card); padding: .75rem .95rem; }}
+  .nugget .tag {{ font: 600 .68rem/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase;
+                  color: var(--accent); margin-bottom: .45rem; }}
+  .nugget b {{ display: block; font-family: var(--font-heading); font-size: 1.02rem; margin-bottom: .25rem; }}
+  .nugget span {{ font-size: .87rem; line-height: 1.45; color: var(--muted); }}
+
+  /* ---- Surprise me (lab/surprise.py) */
+  .fact {{ border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: .8rem;
+           background: var(--card); padding: 1.6rem 1.8rem 1.3rem; margin: .4rem 0 1rem; }}
+  .fact .meta {{ display: flex; justify-content: space-between; font: 600 .72rem/1 var(--font-body);
+                 letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 1rem; }}
+  .fact .q {{ font-family: var(--font-heading); font-size: clamp(1.5rem, 3vw, 2.1rem); line-height: 1.2;
+              font-weight: 600; text-wrap: balance; }}
+  .fact .a {{ font-size: 1.08rem; line-height: 1.6; margin-top: 1rem; max-width: 70ch; }}
+  .fact .why {{ margin-top: .9rem; padding-top: .7rem; border-top: 1px dashed var(--line); color: var(--muted);
+                font-size: .92rem; }}
+  .fact .why b {{ color: var(--accent); }}
+  .dots {{ display: flex; flex-wrap: wrap; gap: 5px; margin: .2rem 0 .8rem; }}
+  .dots i {{ width: 9px; height: 9px; border-radius: 99px; background: var(--line); }}
+  .dots i.on {{ background: var(--accent); }}
+  .dots i.seen {{ background: var(--accent); opacity: .35; }}
+
   .ltable {{ width: 100%; border-collapse: collapse; font-size: .88rem; }}
   .ltable th, .ltable td {{ text-align: left; vertical-align: top; padding: .45rem .6rem; border-bottom: 1px solid var(--line); }}
   .ltable thead th {{ border-bottom: 2px solid var(--line); }}
