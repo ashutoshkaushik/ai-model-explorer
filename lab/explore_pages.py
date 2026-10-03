@@ -4,20 +4,20 @@ import pandas as pd
 import streamlit as st
 
 from ui import chrome
-from ui.filters import base, empty_message, sci, sidebar_filters
-from utils.charts import compare_chart, cost_scatter, fit_growth, model_spotlight, race_chart
+from ui.filters import base, empty_message, sci, sci_compact, sidebar_filters
+from utils.charts import autoplay_html, compare_chart, cost_scatter, fit_growth, model_spotlight, race_chart
 from utils.data_loader import ACCESS_COL, COMPUTE_COL, COST_COL, DATE_COL, MODEL_COL, PARAMS_COL
 from utils.insights import REFERENCE_COSTS, compare, model_profile, race_frames, similar_models, times
 
 FAMOUS = ["GPT-3 175B (davinci)", "AlexNet", "AlphaGo Lee", "Transformer", "BERT-Large"]
 
 
-def fmt(value: float, unit: str) -> str:
+def fmt(value: float, unit: str, compact: bool = False) -> str:
     if pd.isna(value):
-        return "not reported"
+        return "—" if compact else "not reported"
     if unit == "2023 USD":
         return f"${value:,.0f}" if value < 1e6 else f"${value / 1e6:,.1f}M"
-    return sci(value)
+    return sci_compact(value) if compact else sci(value)
 
 
 def model_options(df: pd.DataFrame) -> list[str]:
@@ -36,19 +36,20 @@ def model_label(df: pd.DataFrame):
 def race_page() -> None:
     f = sidebar_filters()
     st.title("The compute race")
-    st.markdown("<div class='lede'>The ten largest training runs ever, year by year. Press play and watch the record "
-                "change hands, and the scale leap by orders of magnitude.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='lede'>The ten largest training runs ever, year by year. It plays on its own; drag the "
+                "slider to any year, or replay it, and watch the scale leap by orders of magnitude.</div>",
+                unsafe_allow_html=True)
     known = f.df[f.df[COMPUTE_COL] > 0]
     if known.empty:
         empty_message()
         return
     lo, hi = int(known["year"].min()), int(known["year"].max())
     a, b = st.columns(2)
-    start = a.slider("Start the race in", lo, max(lo, hi - 1), min(max(lo, 2008), max(lo, hi - 1)), key="race_start")
+    start = a.slider("Start the race in", lo, max(lo, hi - 1), min(max(lo, 2012), max(lo, hi - 1)), key="race_start")
     top_n = b.slider("Bars", 5, 15, 10, key="race_n")
     frames = race_frames(f.df, start, top_n)
-    st.plotly_chart(race_chart(frames, base()["color_domains"], top_n), width="stretch",
-                    config={"displayModeBar": False})
+    fig = race_chart(frames, base()["color_domains"], top_n)
+    st.iframe(autoplay_html(fig, fig.layout.height), height=fig.layout.height + 10)  # our own HTML, no user input
     first, last = frames[frames["frame"] == frames["frame"].min()], frames[frames["frame"] == frames["frame"].max()]
     leap = last[COMPUTE_COL].max() / first[COMPUTE_COL].max()
     st.markdown(
@@ -88,9 +89,12 @@ def model_page() -> None:
                 f"published {r[DATE_COL]:%B %-d, %Y}</div>", unsafe_allow_html=True)
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Training compute", fmt(r[COMPUTE_COL], "FLOP"), border=True)
-    k2.metric("Parameters", fmt(r[PARAMS_COL], "parameters"), border=True)
-    k3.metric("Training cost", fmt(r[COST_COL], "2023 USD"), border=True)
+    k1.metric("Compute (FLOP)", fmt(r[COMPUTE_COL], "FLOP", compact=True), border=True,
+              help=f"{fmt(r[COMPUTE_COL], 'FLOP')} FLOP")
+    k2.metric("Parameters", fmt(r[PARAMS_COL], "parameters", compact=True), border=True,
+              help=fmt(r[PARAMS_COL], "parameters"))
+    k3.metric("Training cost", fmt(r[COST_COL], "2023 USD", compact=True), border=True,
+              help=f"{fmt(r[COST_COL], '2023 USD')} (2023 USD)" if pd.notna(r[COST_COL]) else None)
     k4.metric(f"Rank in {r['year']}", f"#{p.rank_in_year} of {p.known_in_year}" if p.rank_in_year else "—",
               border=True, help="By training compute, among that year's models with known compute")
 
@@ -202,10 +206,10 @@ def cost_page() -> None:
     fit = fit_growth(costed, COST_COL)
     home, film = REFERENCE_COSTS[1][0], REFERENCE_COSTS[2][0]
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Most expensive run", fmt(top[COST_COL], "2023 USD"), border=True,
+    k1.metric("Priciest run", fmt(top[COST_COL], "2023 USD"), border=True,
               help=f"{top[MODEL_COL]} ({top['primary_org']}, {top['year']})")
-    k2.metric("…in US homes", f"{top[COST_COL] / home:,.0f}", border=True, help="At about $400,000 per home")
-    k3.metric("…in blockbuster films", f"{top[COST_COL] / film:,.1f}", border=True, help="At about $200M per film")
+    k2.metric("= US homes", f"{top[COST_COL] / home:,.0f}", border=True, help="At about $400,000 per home")
+    k3.metric("= Blockbuster films", f"{top[COST_COL] / film:,.1f}", border=True, help="At about $200M per film")
     k4.metric("Cost growth", f"{fit.factor_per_year:.1f}×/yr" if fit else "—", border=True,
               help=f"Log-linear fit over {fit.n} models since {fit.start_year}" if fit else None)
 

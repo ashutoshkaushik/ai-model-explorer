@@ -8,7 +8,7 @@ import streamlit as st
 PAGES: dict = {}
 
 # The Explorer Lab tour, in build order: each step adds one idea to the one before
-TOUR = ["lab_data", "lab_log", "lab_growth", "lab_filters", "lab_milestones", "lab_tools"]
+TOUR = ["lab_data", "lab_log", "lab_growth", "lab_filters", "lab_milestones", "lab_tools", "lab_environment"]
 
 
 def go_button(key: str, label: str, primary: bool = False, button_key: str | None = None) -> None:

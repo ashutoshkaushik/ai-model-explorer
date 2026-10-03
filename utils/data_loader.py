@@ -18,8 +18,10 @@ COMPUTE_COL = "Training compute (FLOP)"
 COST_COL = "Training compute cost (2023 USD)"
 ACCESS_COL = "Model accessibility"
 FRONTIER_COL = "Frontier model"
+POWER_COL = "Training power draw (W)"
+TRAIN_TIME_COL = "Training time (hours)"
 
-NUMERIC_COLS = [PARAMS_COL, COMPUTE_COL, COST_COL]
+NUMERIC_COLS = [PARAMS_COL, COMPUTE_COL, COST_COL, POWER_COL, TRAIN_TIME_COL]
 
 
 def _first_value(series: pd.Series) -> pd.Series:
@@ -33,7 +35,7 @@ def _fix_mojibake(text):
     The published CSV has some UTF-8 text that was decoded as Latin-1/Windows-1252 and re-encoded. Undo that
     per value, and keep the original whenever the round trip doesn't produce valid UTF-8.
     """
-    if not isinstance(text, str) or ("Ã" not in text and "Â" not in text):
+    if not isinstance(text, str) or not any(mark in text for mark in ("Ã", "Â", "â")):
         return text
     for codec in ("latin-1", "cp1252"):
         try:
@@ -113,9 +115,18 @@ def models_near(df: pd.DataFrame, date: pd.Timestamp, months: int = 6, n: int = 
 
 
 def frontier_by_year(df: pd.DataFrame) -> pd.DataFrame:
-    """The single highest-compute model for each year, with growth vs. the previous listed year."""
+    """The single highest-compute model of each year, measured against the running record.
+
+    record_to_date is the largest compute published up to and including that year (cummax). new_record says
+    whether the year's top beat every earlier year; growth is its compute ÷ the previous record, so a value
+    below 1 means the year's biggest model was smaller than an earlier one.
+    """
     known = df[df[COMPUTE_COL].notna()]
     if known.empty:
-        return known.assign(growth=pd.Series(dtype=float))
+        return known.assign(record_to_date=pd.Series(dtype=float), new_record=pd.Series(dtype=bool),
+                            growth=pd.Series(dtype=float))
     top = known.loc[known.groupby("year")[COMPUTE_COL].idxmax()].sort_values("year")
-    return top.assign(growth=top[COMPUTE_COL] / top[COMPUTE_COL].shift())
+    record = top[COMPUTE_COL].cummax()
+    previous = record.shift()
+    return top.assign(record_to_date=record, new_record=previous.isna() | (top[COMPUTE_COL] > previous),
+                      growth=top[COMPUTE_COL] / previous)

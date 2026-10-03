@@ -5,7 +5,7 @@ import json
 import streamlit as st
 
 from ui import chrome
-from ui.filters import base, empty_message, sci, sidebar_filters
+from ui.filters import base, empty_message, sci, sci_compact, sidebar_filters
 from utils.charts import METRICS, domain_area, fit_growth, open_donut, open_share_line, over_time_scatter, top_orgs_bar
 from utils.data_loader import COMPUTE_COL, DATE_COL, MODEL_COL
 from utils.llm import LLMError, ask, era_stats, era_summary, get_client
@@ -24,14 +24,16 @@ def explorer_page() -> None:
 
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Models", f"{len(df):,}", border=True)
-    k2.metric("Year range", f"{df['year'].min()}–{df['year'].max()}", border=True)
+    k2.metric("Years", f"{df['year'].min()}–{df['year'].max()}", border=True,
+              help=f"Published {df[DATE_COL].min():%B %-d, %Y} to {df[DATE_COL].max():%B %-d, %Y}")
     k3.metric("Organizations", f"{df['primary_org'].nunique():,}", border=True)
     if df[COMPUTE_COL].notna().any():
         biggest = df.loc[df[COMPUTE_COL].idxmax()]
-        k4.metric("Largest training compute", sci(biggest[COMPUTE_COL]), border=True,
-                  help=f"FLOP · {biggest[MODEL_COL]} ({biggest['primary_org']}, {biggest[DATE_COL]:%b %Y})")
+        k4.metric("Top compute", f"{sci_compact(biggest[COMPUTE_COL])} FLOP", border=True,
+                  help=f"{sci(biggest[COMPUTE_COL])} FLOP · {biggest[MODEL_COL]} ({biggest['primary_org']}, "
+                       f"{biggest[DATE_COL]:%b %Y})")
     else:
-        k4.metric("Largest training compute", "—", border=True)
+        k4.metric("Top compute", "—", border=True)
 
     st.markdown("### Compute over time")
     ctl1, ctl2 = st.columns([3, 1])

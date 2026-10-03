@@ -78,7 +78,10 @@ def apply_theme() -> None:
   [data-testid="stMainBlockContainer"] {{ max-width: 1240px; padding-left: 1.5rem; padding-right: 1.5rem; }}
   [data-testid^="stBaseButton"] * , [data-testid="stWidgetLabel"] * {{ white-space: normal !important; }}
   [data-testid^="stBaseButton"] {{ height: auto; min-height: 2.5rem; }}
-  [data-testid="stMetricValue"] {{ font-family: var(--font-heading); }}
+  /* Stat cards: values scale with the viewport instead of truncating; long labels wrap */
+  [data-testid="stMetricValue"] {{ font-family: var(--font-heading); font-size: clamp(1.35rem, 0.9rem + 1vw, 2rem); }}
+  [data-testid="stMetricValue"] > div {{ overflow: visible; text-overflow: clip; }}
+  [data-testid="stMetricLabel"] p {{ white-space: normal !important; }}
 
   /* ---- Shared components */
   .muted {{ color: var(--muted); }}
@@ -141,9 +144,43 @@ def apply_theme() -> None:
   .nuggets.three {{ grid-template-columns: repeat(3, 1fr); }}
   @media (max-width: 900px) {{ .nuggets.three {{ grid-template-columns: 1fr; }} }}
 
+  /* ---- ELI5 architecture (lab/architecture.py) */
+  .diagram {{ border: 1px solid var(--line); border-radius: .8rem; background: var(--card); padding: .8rem;
+              overflow-x: auto; margin: .3rem 0 1.2rem; }}
+  .legend {{ display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; font-size: .85rem; color: var(--muted); margin: .2rem 0 .5rem; }}
+  .legend i {{ display: inline-block; width: .75rem; height: .75rem; border-radius: 3px; margin-right: .35rem;
+               vertical-align: -1px; }}
+  .journey {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: .4rem 0 1rem; }}
+  @media (max-width: 1000px) {{ .journey {{ grid-template-columns: 1fr; }} }}
+  .journey > div {{ border: 1px solid var(--line); border-top-width: 3px; border-radius: .6rem; background: var(--card);
+                    padding: .7rem .8rem; }}
+  .journey .you {{ border-top-color: var(--accent); }}
+  .journey .llm {{ border-top-color: var(--llm); }}
+  .journey .code {{ border-top-color: var(--code); }}
+  .journey .n {{ font-family: var(--font-heading); font-size: 1.4rem; font-weight: 600; color: var(--muted);
+                 display: block; line-height: 1; }}
+  .journey b {{ display: block; font-family: var(--font-heading); font-size: 1rem; margin: .3rem 0 .2rem; }}
+  .journey span:last-child {{ font-size: .85rem; color: var(--muted); line-height: 1.4; }}
+
+  /* ---- Hero sparkline (Start here) */
+  .hero-chart {{ border: 1px solid var(--line); border-radius: .8rem; background: var(--card); padding: .8rem 1rem .7rem;
+                 margin: .6rem 0 .8rem; }}
+  .hc-svg svg {{ width: 100%; height: auto; display: block; }}
+  .hc-label {{ font: 600 .7rem/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+               margin-bottom: .2rem; }}
+  .hc-chips {{ display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }}
+  .hc-chips span {{ font-size: .82rem; padding: .15rem .6rem; border-radius: 99px; border: 1px solid var(--line);
+                    color: var(--ink); cursor: help; }}
+
   /* ---- Live counter (Start here) */
   .live {{ border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: .6rem;
            background: var(--card); padding: .9rem 1.2rem; margin: .3rem 0 1rem; }}
+  .live-row {{ display: flex; flex-wrap: wrap; gap: .4rem 2.4rem; }}
+  .live-k {{ font: 600 .7rem/1.2 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }}
+  .live-dot {{ display: inline-block; width: .55rem; height: .55rem; border-radius: 99px; background: var(--success);
+               margin-right: .45rem; vertical-align: 1px; animation: live-pulse 1s ease-in-out infinite; }}
+  @keyframes live-pulse {{ 50% {{ opacity: .25; }} }}
+  @media (prefers-reduced-motion: reduce) {{ .live-dot {{ animation: none; }} }}
   .live .tick {{ font-family: var(--font-heading); font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 600;
                  color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }}
   .live .lede {{ font-size: 1rem; margin-top: .3rem; }}

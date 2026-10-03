@@ -22,6 +22,16 @@ def sci(x: float) -> str:
     return f"{x / 10**exp:.1f} × 10{str(exp).translate(SUPERSCRIPT)}"
 
 
+def sci_compact(x: float) -> str:
+    """Short form for stat cards: 1.0001e27 -> '10²⁷', 3.14e23 -> '3.1×10²³'."""
+    exp = math.floor(math.log10(x))
+    mantissa = round(x / 10**exp, 1)
+    if mantissa >= 10:
+        mantissa, exp = mantissa / 10, exp + 1
+    power = f"10{str(exp).translate(SUPERSCRIPT)}"
+    return power if mantissa == 1 else f"{mantissa:.1f}×{power}"
+
+
 @dataclass
 class Filtered:
     df: pd.DataFrame          # sidebar-filtered models

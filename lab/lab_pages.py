@@ -10,12 +10,16 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lab.nav import tour_footer
+from lab.nav import TOUR, tour_footer
 from ui import chrome
-from ui.filters import base
-from utils.charts import _base_layout, color_map, fit_growth, fold_other, palette
+from ui.filters import base, sci
+from utils.charts import _base_layout, color_map, fit_growth, fold_other, log_over_time, palette
 from utils.data_loader import (
     ACCESS_COL, COMPUTE_COL, DATE_COL, DOMAIN_COL, MODEL_COL, ORG_COL, PARAMS_COL,
+)
+from utils.insights import (
+    CAR_T_CO2_PER_YEAR, DEFAULT_WATER_L_PER_KWH, GRID_PRESETS, HOME_KWH_PER_YEAR, MAX_FLOP_PER_JOULE, OLYMPIC_POOL_L,
+    footprint,
 )
 from utils.llm import QUERIES, TOOLS, run_query
 
@@ -30,6 +34,7 @@ KEY_CODE = {
     "lab_filters": [("utils/charts.py", "color_map"), ("utils/data_loader.py", "apply_filters")],
     "lab_milestones": [("utils/charts.py", "add_milestones"), ("utils/data_loader.py", "frontier_by_year")],
     "lab_tools": [("utils/llm.py", "run_query"), ("utils/llm.py", "ask")],
+    "lab_environment": [("utils/insights.py", "footprint")],
 }
 
 
@@ -53,7 +58,7 @@ def key_code(key: str) -> None:
 
 
 def header(step: int, title: str, lede: str) -> None:
-    st.markdown(f"<div class='eyebrow'>Explorer Lab · step {step} of 6</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='eyebrow'>Explorer Lab · step {step} of {len(TOUR)}</div>", unsafe_allow_html=True)
     st.title(title)
     st.markdown(f"<div class='lede'>{lede}</div>", unsafe_allow_html=True)
 
@@ -148,6 +153,9 @@ NUGGETS = {  # key: [(tag, headline, body)], 4 per Lab page
         ("pandas", "idxmax() picks the first tie",
          "If two models share a year's top compute, <code>idxmax</code> returns the first one it meets. The loader "
          "sorts newest first, so ties go to the later model."),
+        ("Honesty", "A yearly top is not a record",
+         "Some years' biggest model is smaller than an earlier one. The leaderboard keeps a running record "
+         "(<code>cummax()</code>) and marks those years \"not a new record\" instead of showing a fake decline."),
     ],
     "lab_tools": [
         ("Concept", "Tool use is structured output",
@@ -162,6 +170,26 @@ NUGGETS = {  # key: [(tag, headline, body)], 4 per Lab page
         ("Prompting", "Descriptions are prompts",
          "Claude picks tools by reading their names and descriptions. Short, specific descriptions with an example "
          "(\"e.g. 'GPT-4'\") choose better than long ones."),
+    ],
+    "lab_environment": [
+        ("Hardware", "A frontier cluster is a power station's customer",
+         "100,000 NVIDIA H100 GPUs at up to 700 W each draw 70 MW for the chips alone, before CPUs, networking and "
+         "cooling. That's the scale of the largest training runs on this page."),
+        ("Data centres", "PUE: the overhead on every watt",
+         "Power usage effectiveness = total facility energy ÷ computing energy. Google reports a fleet average near "
+         "1.1; surveys put the industry average around 1.5, meaning half as much again goes to cooling and losses."),
+        ("Grid", "Where you train matters as much as how much",
+         "BLOOM (176B parameters) was trained in France on a mostly nuclear grid. Its authors estimated about 25 "
+         "tonnes of CO₂ from training electricity, far below what the same energy would emit on a coal-heavy grid."),
+        ("Water", "Cooling is thirsty",
+         "Researchers at UC Riverside (\"Making AI Less Thirsty\", 2023) estimated that training GPT-3 in Microsoft's US "
+         "data centres could have consumed around 700,000 litres of fresh water."),
+        ("Big picture", "Data centres: about 1.5% of world electricity",
+         "The International Energy Agency estimated data centres used about 415 TWh in 2024, roughly 1.5% of global "
+         "electricity, and expects that to roughly double by 2030, with AI the main driver."),
+        ("History", "The paper that started the conversation",
+         "Strubell, Ganesh and McCallum (2019), \"Energy and Policy Considerations for Deep Learning in NLP\", put "
+         "carbon numbers on model training and pushed researchers to report energy alongside accuracy."),
     ],
 }
 
@@ -393,6 +421,129 @@ def lab_tools() -> None:
     tour_footer("lab_tools")
 
 
+# --- 7 · The environmental cost ------------------------------------------------------------------
+
+
+def set_grid() -> None:
+    preset = st.session_state.get("env_preset")
+    if preset:
+        st.session_state.env_grid = GRID_PRESETS[preset]
+
+
+def lab_environment() -> None:
+    b = base()
+    df = b["df_all"]
+    header(7, "The environmental cost",
+           "Training a model takes electricity, and electricity has a footprint. The energy below is measured from the "
+           "data; the carbon and water depend on where and how that power was made, so you set those assumptions.")
+
+    st.markdown("### Set the assumptions")
+    left, right = st.columns(2)
+    with left:
+        st.segmented_control("Electricity grid", list(GRID_PRESETS), default="World average", key="env_preset",
+                             on_change=set_grid)
+        grid = st.slider("Grams of CO₂ per kWh", 0, 1000, GRID_PRESETS["World average"], step=10, key="env_grid",
+                         help="Low-carbon grids (hydro, nuclear, wind) are near 50; coal-heavy grids exceed 800.")
+    with right:
+        water = st.slider("Litres of water per kWh (cooling)", 0.0, 5.0, DEFAULT_WATER_L_PER_KWH, step=0.1,
+                          key="env_water", help="Data-centre on-site water use. Air-cooled sites in cool climates can "
+                          "be near zero; evaporative cooling in hot climates is higher.")
+
+    f = footprint(df, grid, water)
+    top = f.loc[f["energy_mwh"].idxmax()]
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Largest run (MWh)", f"{top['energy_mwh']:,.0f}", border=True,
+              help=f"{top[MODEL_COL]} ({top['primary_org']}, {top['year']}): {top['power_mw']:,.0f} MW for "
+                   f"{top['days']:,.0f} days")
+    k2.metric("= US home-years", f"{top['home_years']:,.0f}", border=True,
+              help=f"At about {HOME_KWH_PER_YEAR:,} kWh per home per year")
+    k3.metric("= Car-years of CO₂", f"{top['car_years']:,.0f}", border=True,
+              help=f"{top['co2_t']:,.0f} tonnes CO₂ at {grid} g/kWh; a typical car emits about {CAR_T_CO2_PER_YEAR} t a year")
+    k4.metric("= Olympic pools", f"{top['water_l'] / OLYMPIC_POOL_L:,.1f}", border=True,
+              help=f"{top['water_l'] / 1e6:,.0f} million litres at {water} L/kWh")
+    st.caption(f"{len(f)} of {len(df):,} models report both power draw and training time, so this page covers "
+               f"{len(f)} models from {f['year'].min()} to {f['year'].max()}.")
+
+    st.markdown("### Energy per training run")
+    energy_fit = fit_growth(f, "energy_mwh", start_year=2012)
+    st.plotly_chart(log_over_time(
+        f, "energy_mwh", "Training energy (MWh, log scale)", b["color_domains"], energy_fit,
+        [(HOME_KWH_PER_YEAR / 1000, "one US home for a year"), (HOME_KWH_PER_YEAR, "1,000 homes for a year")],
+        hover_value="%{y:,.1f} MWh"), width="stretch")
+
+    st.markdown("### Chips get greener; runs grow faster")
+    eff = f.dropna(subset=["flop_per_joule"])
+    eff_fit = fit_growth(eff, "flop_per_joule", start_year=2012)
+    if energy_fit and eff_fit:
+        st.markdown(
+            f"<div class='callout'>Hardware does about <b>{eff_fit.factor_per_year:.1f}× more computation per joule each "
+            f"year</b>, yet energy per training run still grows <b>~{energy_fit.factor_per_year:.1f}× per year</b>. "
+            "Efficiency gains are spent on bigger runs instead of smaller bills, a pattern economists call the "
+            "Jevons paradox.</div>", unsafe_allow_html=True)
+    st.plotly_chart(log_over_time(eff, "flop_per_joule", "Computation per joule (FLOP/J, log scale)",
+                                  b["color_domains"], eff_fit, hover_value="%{y:.2e} FLOP per joule", height=400),
+                    width="stretch")
+    dropped = f["flop_per_joule"].isna() & (f[COMPUTE_COL] > 0)
+    st.caption(f"{int(dropped.sum())} models are left out of this chart because their numbers imply more than "
+               f"{sci(MAX_FLOP_PER_JOULE).replace(".0 ", " ")} FLOP per joule, beyond any real chip. They are fine-tunes whose compute "
+               "includes the base model's training while their training time covers only the fine-tune.")
+
+    st.markdown("### Look up a model")
+    name = st.selectbox("Model", f.sort_values("energy_mwh", ascending=False)[MODEL_COL], key="env_model")
+    r = f[f[MODEL_COL] == name].iloc[0]
+    st.markdown(
+        f"<div class='callout'><b>{name}</b> ({r['primary_org']}, {r['year']}) drew about <b>{r['power_mw']:,.2f} MW</b> "
+        f"for <b>{r['days']:,.1f} days</b>: <b>{r['energy_mwh']:,.1f} MWh</b>, as much electricity as "
+        f"<b>{r['home_years']:,.1f} US homes</b> use in a year. On your grid that's about <b>{r['co2_t']:,.1f} t CO₂</b> "
+        f"({r['car_years']:,.1f} car-years) and <b>{r['water_l']:,.0f} litres</b> of cooling water.</div>",
+        unsafe_allow_html=True)
+
+    st.markdown("### The ten most energy-hungry training runs")
+    st.dataframe(f.nlargest(10, "energy_mwh")[[MODEL_COL, "primary_org", "year", "power_mw", "days", "energy_mwh",
+                                                "co2_t", "home_years"]],
+                 hide_index=True, width="stretch", column_config={
+                     "primary_org": "Organization", "year": st.column_config.NumberColumn("Year", format="%d"),
+                     "power_mw": st.column_config.NumberColumn("Power (MW)", format="%,.1f"),
+                     "days": st.column_config.NumberColumn("Days", format="%,.0f"),
+                     "energy_mwh": st.column_config.NumberColumn("Energy (MWh)", format="%,.0f"),
+                     "co2_t": st.column_config.NumberColumn("CO₂ (t, your grid)", format="%,.0f"),
+                     "home_years": st.column_config.NumberColumn("≈ US home-years", format="%,.0f")})
+
+    st.markdown("### What this page can't see")
+    st.markdown(
+        "<div class='steps'>"
+        "<div class='llm'><b>Using the model</b><span>Every answer a model gives also takes energy. For a popular "
+        "model, that use over its lifetime can far exceed the one-off training run counted here.</span></div>"
+        "<div class='code'><b>Making the chips</b><span>Manufacturing GPUs, servers and buildings has its own "
+        "\"embodied\" emissions, spread across every job the hardware ever runs.</span></div>"
+        "<div class='data'><b>Everything else</b><span>Failed runs, experiments and hyperparameter searches, and "
+        "the actual grid mix at the hour and place of training, are rarely published.</span></div>"
+        "</div>", unsafe_allow_html=True)
+    chrome.credit()
+    key_code("lab_environment")
+    learn(
+        ["How to turn power and time into energy, carbon and water", "Why efficiency gains don't shrink the total",
+         "How to sanity-check a derived number against physics"],
+        ["**Energy is measured; carbon and water are assumptions.** Energy = power draw × training time. Multiplying by "
+         "a grid's carbon intensity or a site's water use is a modelling choice, so the page shows the knobs instead "
+         "of hiding them.",
+         "**Change the grid from coal-heavy to low-carbon** and the CO₂ falls by over 90% while the energy stays the "
+         "same. Where a model is trained can matter more than how big it is.",
+         "**Check derived numbers against physics.** Dividing compute by energy gives FLOP per joule. A few results "
+         "were thousands of times beyond any real chip: the data was right, but the two columns described different "
+         "runs (base model vs fine-tune)."],
+        [("Is AI bad for the environment?",
+          "It depends on scale, grid and use. One training run of a frontier model uses as much electricity as tens of "
+          "thousands of homes do in a year, but small models train on a laptop's worth. The fastest-growing part is "
+          "usage, which this dataset doesn't cover."),
+         ("Why not just use the cost column to estimate energy?",
+          "Cost mixes hardware prices, cloud margins and electricity. Power × time measures energy directly; it's "
+          "available for fewer models, but it means what it says.")],
+    )
+    nuggets("lab_environment")
+    tour_footer("lab_environment")
+
+
 LAB_PAGES = {  # key: (title, icon, page function), in TOUR order
     "lab_data": ("1 · Load and clean", ":material/dataset:", lab_data),
     "lab_log": ("2 · Log scales", ":material/show_chart:", lab_log),
@@ -400,4 +551,5 @@ LAB_PAGES = {  # key: (title, icon, page function), in TOUR order
     "lab_filters": ("4 · Stable filters", ":material/filter_alt:", lab_filters),
     "lab_milestones": ("5 · Milestones and eras", ":material/flag:", lab_milestones),
     "lab_tools": ("6 · Safe tool use", ":material/build:", lab_tools),
+    "lab_environment": ("7 · The environmental cost", ":material/eco:", lab_environment),
 }

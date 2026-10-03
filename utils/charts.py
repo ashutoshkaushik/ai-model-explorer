@@ -350,21 +350,32 @@ def open_share_line(df: pd.DataFrame, min_models: int = 5) -> go.Figure | None:
 
 
 def leaderboard_step(top: pd.DataFrame) -> go.Figure:
-    """Step chart of the highest training compute per year (log scale)."""
-    fig = go.Figure(
-        go.Scatter(
-            x=top["year"],
-            y=top[COMPUTE_COL],
-            mode="lines+markers",
-            line=dict(color=palette()[0], width=2, shape="hv"),
-            marker=dict(size=8, line=dict(width=2, color=chart_tokens()["surface"])),
-            customdata=np.stack([top[MODEL_COL], top["primary_org"]], axis=-1),
-            hovertemplate="<b>%{x}: %{customdata[0]}</b><br>%{customdata[1]}<br>%{y:.2e} FLOP<extra></extra>",
-        )
-    )
+    """Running record of training compute (step line) with each year's top model as a marker.
+
+    Filled markers set a new record; hollow ones were the year's biggest but smaller than an earlier record.
+    """
+    t = chart_tokens()
+    color = palette()[0]
+    fig = go.Figure(go.Scatter(
+        x=top["year"], y=top["record_to_date"], mode="lines", name="Record to date",
+        line=dict(color=color, width=2, shape="hv"), hoverinfo="skip",
+    ))
+    for is_record, name in ((True, "New record"), (False, "Year's top, not a new record")):
+        s = top[top["new_record"] == is_record]
+        if s.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=s["year"], y=s[COMPUTE_COL], mode="markers", name=name,
+            marker=dict(size=9 if is_record else 8, color=color if is_record else t["surface"],
+                        line=dict(width=2, color=color if is_record else t["muted"])),
+            customdata=np.stack([s[MODEL_COL], s["primary_org"]], axis=-1),
+            hovertemplate="<b>%{x}: %{customdata[0]}</b><br>%{customdata[1]}<br>%{y:.2e} FLOP"
+                          + ("" if is_record else "<br>Not a new record") + "<extra></extra>",
+        ))
     fig.update_yaxes(type="log", title="Training compute (FLOP, log scale)", exponentformat="power")
     fig.update_xaxes(title=None)
-    return _base_layout(fig, "Highest training compute per year", height=440)
+    fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+    return _base_layout(fig, height=460)  # the page heading names the chart; a title here collides with the legend
 
 
 # --- Compute race ----------------------------------------------------------------------------
@@ -379,14 +390,18 @@ def race_chart(frames: pd.DataFrame, domains: list[str], top_n: int) -> go.Figur
     colors = color_map(domains + ["Other"])
     d = frames.assign(domain=fold_other(frames["primary_domain"], domains))
     lo = np.floor(np.log10(d[COMPUTE_COL].min()))
-    hi = np.log10(d[COMPUTE_COL].max()) + 2.2  # room for the outside labels
+    hi = np.log10(d[COMPUTE_COL].max()) + 0.6
 
     def bar(f: pd.DataFrame) -> go.Bar:
         return go.Bar(
             x=f[COMPUTE_COL], y=f["rank"], orientation="h",
             marker=dict(color=[colors[x] for x in f["domain"]], cornerradius=3),
             text=[f"{m} · {o}, {y}" for m, o, y in zip(f[MODEL_COL], f["primary_org"], f["year"])],
-            textposition="outside", cliponaxis=False, textfont=dict(color=t["ink"], size=12),
+            # inside long bars (right-aligned), outside short ones, so labels never run off the edge. Positions are
+            # set per bar rather than "auto", which mis-measures text mid-animation and piles labels up.
+            textposition=["inside" if np.log10(x) - lo > 0.55 * (hi - lo) else "outside" for x in f[COMPUTE_COL]],
+            insidetextanchor="end", constraintext="none", cliponaxis=False,
+            insidetextfont=dict(color="#ffffff", size=12), outsidetextfont=dict(color=t["ink"], size=12),
             customdata=np.stack([f[MODEL_COL], f["primary_org"], f["domain"]], axis=-1),
             hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]} · %{customdata[2]}<br>%{x:.2e} FLOP<extra></extra>",
             showlegend=False,
@@ -405,13 +420,15 @@ def race_chart(frames: pd.DataFrame, domains: list[str], top_n: int) -> go.Figur
     fig.frames = [go.Frame(data=[bar(d[d["frame"] == y])], traces=[0], name=str(y),
                            layout=go.Layout(annotations=year_label(y))) for y in years]
     step_ms = 700
+    # Controls sit on separate rows so nothing overlaps at any width: legend and Play/Pause above the plot,
+    # the year slider below the axis title.
     fig.update_layout(
         annotations=year_label(years[0]),
         bargap=0.25,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, xanchor="left"),
         updatemenus=[dict(
-            type="buttons", direction="left", x=0, y=-0.2, xanchor="left", yanchor="top", showactive=False,
-            pad=dict(r=10, t=0), bgcolor=t["card"], bordercolor=t["line"], font=dict(color=t["ink"]),
+            type="buttons", direction="left", x=1, y=1.02, xanchor="right", yanchor="bottom", showactive=False,
+            pad=dict(r=0, t=0, b=4), bgcolor=t["card"], bordercolor=t["line"], font=dict(color=t["ink"]),
             buttons=[
                 dict(label="▶ Play", method="animate", args=[None, dict(
                     frame=dict(duration=step_ms, redraw=True), transition=dict(duration=step_ms * 0.6),
@@ -421,8 +438,9 @@ def race_chart(frames: pd.DataFrame, domains: list[str], top_n: int) -> go.Figur
             ],
         )],
         sliders=[dict(
-            active=0, x=0.16, y=-0.17, len=0.84, pad=dict(t=0), currentvalue=dict(visible=False),
-            bgcolor=t["line"], activebgcolor=t["accent"], bordercolor=t["line"], font=dict(color=t["muted"]),
+            active=0, x=0, y=0, len=1, xanchor="left", yanchor="top", pad=dict(t=70, b=0),
+            currentvalue=dict(visible=False), bgcolor=t["line"], activebgcolor=t["accent"], bordercolor=t["line"],
+            font=dict(color=t["muted"]), ticklen=4,
             steps=[dict(label=str(y), method="animate", args=[[str(y)], dict(
                 frame=dict(duration=0, redraw=True), transition=dict(duration=0), mode="immediate")])
                 for y in years],
@@ -430,9 +448,25 @@ def race_chart(frames: pd.DataFrame, domains: list[str], top_n: int) -> go.Figur
     )
     fig.update_xaxes(type="log", range=[lo, hi], title="Training compute (FLOP, log scale)", exponentformat="power")
     fig.update_yaxes(range=[top_n + 0.6, 0.4], showticklabels=False, showgrid=False, title=None)
-    fig = _base_layout(fig, height=110 + 42 * top_n)
-    fig.update_layout(margin=dict(l=10, r=10, t=40, b=150))
+    fig = _base_layout(fig, height=170 + 42 * top_n)
+    fig.update_layout(margin=dict(l=10, r=10, t=70, b=120))
     return fig
+
+
+def autoplay_html(fig: go.Figure, height: int) -> str:
+    """A standalone page for an animated figure that starts playing on load.
+
+    st.plotly_chart can't autoplay, so the race is rendered with plotly.js in an st.iframe. The iframe
+    gets the site fonts and a transparent background matching the current light/dark mode.
+    """
+    body = fig.to_html(include_plotlyjs="cdn", full_html=False, auto_play=True, default_height=f"{height}px",
+                       config={"displayModeBar": False, "responsive": True})
+    fonts = ("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600&"
+             "family=Source+Serif+4:opsz,wght@8..60,600&display=swap")
+    return (f"<!doctype html><html><head><meta charset='utf-8'><link rel='stylesheet' href='{fonts}'>"
+            f"<style>:root{{color-scheme:{theme.mode()}}} html,body{{margin:0;background:{theme.tokens()['surface']}}}"
+            "</style>"
+            f"</head><body>{body}</body></html>")
 
 
 # --- Model spotlight and comparison ----------------------------------------------------------
@@ -531,3 +565,41 @@ def cost_scatter(df: pd.DataFrame, domains: list[str], fit: GrowthFit | None,
     fig.update_xaxes(title=None)
     fig.update_layout(legend=dict(itemsizing="constant"))
     return _base_layout(fig, height=540)
+
+
+# --- Environmental footprint -----------------------------------------------------------------
+
+
+def log_over_time(df: pd.DataFrame, col: str, y_title: str, domains: list[str], fit: GrowthFit | None,
+                  references: list[tuple[float, str]] = (), hover_value: str = "%{y:,.3s}",
+                  height: int = 460) -> go.Figure:
+    """Generic log-scale scatter of one column over time, coloured by domain, with an optional trend line
+    and labelled horizontal reference lines (e.g. 'one US home for a year')."""
+    t = chart_tokens()
+    d = df[df[col] > 0].assign(domain=lambda x: fold_other(x["primary_domain"], domains))
+    colors = color_map(domains + ["Other"])
+    fig = go.Figure()
+    for dom in domains + ["Other"]:
+        s = d[d["domain"] == dom]
+        if s.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=s[DATE_COL], y=s[col], mode="markers", name=dom,
+            marker=dict(size=9, color=colors[dom], opacity=0.85, line=dict(width=1, color=t["surface"])),
+            customdata=np.stack([s[MODEL_COL], s["primary_org"]], axis=-1),
+            hovertemplate=f"<b>%{{customdata[0]}}</b><br>%{{customdata[1]}} · %{{x|%b %Y}}<br>{hover_value}<extra></extra>",
+        ))
+    if fit is not None and not d.empty:
+        xs = pd.date_range(pd.Timestamp(year=fit.start_year, month=1, day=1), d[DATE_COL].max(), periods=40)
+        fig.add_trace(go.Scatter(
+            x=xs, y=10 ** (fit.intercept + fit.slope * decimal_year(pd.Series(xs))), mode="lines",
+            name=f"Trend (~{fit.factor_per_year:.1f}×/yr)", line=dict(color=t["ink"], width=2, dash="dash"),
+            hoverinfo="skip"))
+    for value, label in references:
+        fig.add_hline(y=value, line=dict(color=t["rule"], width=1, dash="dot"), layer="below")
+        fig.add_annotation(x=0, xref="paper", y=np.log10(value), yref="y", text=label, showarrow=False,
+                           xanchor="left", yanchor="bottom", font=dict(size=11, color=t["muted"]), bgcolor=t["label_bg"])
+    fig.update_yaxes(type="log", title=y_title, exponentformat="power")
+    fig.update_xaxes(title=None)
+    fig.update_layout(legend=dict(itemsizing="constant"))
+    return _base_layout(fig, height=height)

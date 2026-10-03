@@ -5,14 +5,14 @@ An interactive Streamlit app for exploring how AI models have grown from 1950 to
 **Pages** (sidebar navigation, light and dark themes that follow your system setting):
 
 - **App**
-  - **Start here:** headline numbers, a **live counter** of how much the compute trend has grown since you opened the page, the three eras of AI, **What's new** in the data (the latest models, plus what the last refresh added), and where to go next.
+  - **Start here:** an animated sparkline of the record training compute (1950 → today) that draws itself on load and highlights the current record holder, a **🎲 random model** button, a **live counter** of how much the compute trend has grown since you opened the page, the three eras of AI, **What's new** in the data (the latest models, plus what the last refresh added), and where to go next.
   - **Explorer:** a log-scale **Compute Over Time** scatter. You can switch the y-axis between training compute, parameters, and cost. It includes a fitted growth trend (about 4.3× per year since 2010), shaded eras, and milestone markers, followed by breakdown charts: top organizations, models per year by domain, and open vs. closed weights.
-  - **The compute race:** an animated bar race of the ten largest training runs so far, year by year. Press play and watch the record grow by hundreds of millions of times.
+  - **The compute race:** an animated bar race of the ten largest training runs so far, year by year from 2012. It plays automatically on load; drag the slider to any year.
   - **Find a model:** pick any model for a profile card: its rank that year, percentile, how far above or below the trend line it sits, a spotlight chart, and the most similar models. The URL updates, so you can share a link to any model.
   - **Compare two models:** side by side, with a headline like "GPT-3 used 668,085× the training compute of AlexNet" and a ratio chart for compute, parameters and cost.
   - **Ask the Data:** plain-English questions answered by Claude through **tool use**. Claude chooses one of 9 safe, predefined query functions, the app runs it on the filtered data, and Claude summarizes the result. It never generates or executes code. An **Era Summary** button writes a short narrative of the selected period.
-- **Overview:** Milestones timeline, Frontier leaderboard, **What training costs** (cost per run over time against familiar price tags like a US home or a Hollywood film), Browse the data (search + CSV export), and How it's built.
-- **Explorer Lab · built step by step:** six pages, one per build step (cleaning, log scales, the growth fit, stable filter colours, milestones, safe tool use). Each has a live experiment, the key code read from the source, lessons learned, and knowledge nuggets.
+- **Overview:** Milestones timeline, Frontier leaderboard (the running record, with years whose biggest model didn't beat it marked "not a new record"), **What training costs** (cost per run over time against familiar price tags like a US home or a Hollywood film), Browse the data (search + CSV export), **How it works (ELI5)** (the whole app as one simple diagram, plus the journey of one question), and How it's built.
+- **Explorer Lab · built step by step:** seven pages, one per build step (cleaning, log scales, the growth fit, stable filter colours, milestones, safe tool use) plus **the environmental cost**: training energy from Epoch AI's power draw × training time, with adjustable grid-carbon and water assumptions, efficiency vs. energy trends, and what the numbers can't see. Each has a live experiment, the key code read from the source, lessons learned, and knowledge nuggets.
 - **Surprise me:** 25 curated AI facts, each posed as a question you reveal, with next / previous / shuffle.
 - **Sidebar filters** (year range, domain, organization, accessibility, frontier-only) apply to every chart, table, and LLM query, and carry over between pages.
 
@@ -115,7 +115,8 @@ flowchart LR
 | `lab/home.py`, `lab/app_pages.py` | App: Start here, Explorer, Ask the Data |
 | `lab/explore_pages.py` | The compute race, Find a model, Compare two models, What training costs |
 | `lab/overview.py` | Overview: milestones timeline, frontier leaderboard, data browser, how it's built |
-| `lab/lab_pages.py` | Explorer Lab: six build steps with live experiments, key code and knowledge nuggets |
+| `lab/architecture.py` | How it works (ELI5): theme-aware SVG diagram of the app and one question's journey |
+| `lab/lab_pages.py` | Explorer Lab: seven steps (including the environmental cost) with live experiments, key code and knowledge nuggets |
 | `lab/surprise.py` | Surprise me: 25 hand-written AI facts, one at a time |
 | `lab/nav.py` | Page registry, Lab tour order, Previous / Next buttons |
 | `ui/theme.py`, `.streamlit/config.toml` | Claude-style light/dark theme shared with the RAG and Travel Agent projects |

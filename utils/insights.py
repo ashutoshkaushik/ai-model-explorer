@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from utils.charts import GrowthFit, decimal_year
-from utils.data_loader import COMPUTE_COL, COST_COL, DATE_COL, MODEL_COL, PARAMS_COL
+from utils.data_loader import COMPUTE_COL, COST_COL, DATE_COL, MODEL_COL, PARAMS_COL, POWER_COL, TRAIN_TIME_COL
 
 SECONDS_PER_YEAR = 365.25 * 24 * 3600
 CHANGES_PATH = Path(__file__).resolve().parent.parent / "data" / "changes.json"
@@ -130,3 +130,40 @@ def load_changes() -> dict | None:
         return json.loads(CHANGES_PATH.read_text())
     except (FileNotFoundError, json.JSONDecodeError):
         return None
+
+
+# --- Environmental footprint ---------------------------------------------------------------------
+# Energy is measured from the data (Epoch AI's power draw × training time). CO2 and water are estimates
+# that depend on where and how the electricity was made, so the page lets the reader set those assumptions.
+
+HOME_KWH_PER_YEAR = 10_500         # average US home's electricity use in a year (EIA, rounded)
+CAR_T_CO2_PER_YEAR = 4.6           # typical US passenger car, tonnes CO2 per year (EPA)
+OLYMPIC_POOL_L = 2_500_000         # litres in an Olympic swimming pool
+GRID_PRESETS = {                   # grams CO2 per kWh of electricity, rounded
+    "Low-carbon grid": 50,         # mostly hydro, nuclear, wind
+    "World average": 480,
+    "Coal-heavy grid": 820,
+}
+DEFAULT_WATER_L_PER_KWH = 1.8      # commonly cited data-centre on-site water use (WUE)
+MAX_FLOP_PER_JOULE = 5e12          # above any real accelerator; higher values are data mismatches
+
+
+def footprint(df: pd.DataFrame, g_co2_per_kwh: float, water_l_per_kwh: float) -> pd.DataFrame:
+    """Models with both power draw and training time, with energy, CO2, water and efficiency columns.
+
+    flop_per_joule is NaN when compute is unknown or physically implausible (typically a fine-tune whose
+    compute includes the base model's training while its time covers only the fine-tune).
+    """
+    d = df[(df[POWER_COL] > 0) & (df[TRAIN_TIME_COL] > 0)].copy()
+    kwh = d[POWER_COL] * d[TRAIN_TIME_COL] / 1000
+    fpj = d[COMPUTE_COL] / (kwh * 3.6e6)
+    return d.assign(
+        energy_mwh=kwh / 1000,
+        co2_t=kwh * g_co2_per_kwh / 1e6,
+        water_l=kwh * water_l_per_kwh,
+        home_years=kwh / HOME_KWH_PER_YEAR,
+        car_years=kwh * g_co2_per_kwh / 1e6 / CAR_T_CO2_PER_YEAR,
+        power_mw=d[POWER_COL] / 1e6,
+        days=d[TRAIN_TIME_COL] / 24,
+        flop_per_joule=fpj.where((fpj > 0) & (fpj <= MAX_FLOP_PER_JOULE)),
+    )

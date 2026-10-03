@@ -1,5 +1,6 @@
 """Overview pages: the milestone timeline, the frontier leaderboard, the data browser, and how it's built."""
 
+import pandas as pd
 import streamlit as st
 
 from ui import chrome
@@ -39,28 +40,36 @@ def timeline_page() -> None:
 def leaderboard_page() -> None:
     f = sidebar_filters()
     st.title("Frontier leaderboard")
-    st.markdown("<div class='lede'>The single highest-compute model of each year, and how many times bigger it was than "
-                "the year before.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='lede'>The running record for training compute, and each year's biggest model: did it set a "
+                "new record, and by how much?</div>", unsafe_allow_html=True)
     top = frontier_by_year(f.df)
     if top.empty:
         st.info("No models with known training compute match the current filters.")
         chrome.credit()
         return
     st.plotly_chart(leaderboard_step(top), width="stretch")
+    records = int(top["new_record"].sum())
+    st.caption(f"The line is the record to date: the largest training run published up to that year, so it never "
+               f"goes down. Each marker is that year's biggest model; {len(top) - records} of {len(top)} years' "
+               "biggest models were smaller than an earlier record (hollow markers, \"not a new record\"). Comparing "
+               "against the record rather than the previous year avoids showing a slow year as a decline.")
+    table = top.sort_values("year", ascending=False).assign(
+        compute=lambda t: t[COMPUTE_COL].map(lambda x: f"{sci(x)} FLOP"),
+        status=lambda t: t["new_record"].map({True: "New record", False: "Not a new record"}),
+        vs_record=lambda t: [f"{g:,.1f}×" if rec and pd.notna(g) else "—" for g, rec in zip(t["growth"], t["new_record"])],
+    )
     st.dataframe(
-        top.sort_values("year", ascending=False)
-        .assign(**{COMPUTE_COL: lambda t: t[COMPUTE_COL].map("{:.2e}".format)})[
-            ["year", MODEL_COL, "primary_org", "primary_domain", COMPUTE_COL, "growth"]
-        ],
+        table[["year", MODEL_COL, "primary_org", "primary_domain", "compute", "status", "vs_record"]],
         hide_index=True,
         width="stretch",
         column_config={
             "year": st.column_config.NumberColumn("Year", format="%d"),
             "primary_org": "Organization",
             "primary_domain": "Domain",
-            COMPUTE_COL: "Compute (FLOP)",
-            "growth": st.column_config.NumberColumn(
-                "× previous year's top", format="%.1f×", help="Ratio to the top model of the previous listed year"),
+            "compute": "Compute",
+            "status": "Record?",
+            "vs_record": st.column_config.TextColumn(
+                "× previous record", help="How many times the previous record this new record was"),
         },
     )
     chrome.credit()

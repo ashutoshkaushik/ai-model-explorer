@@ -71,6 +71,30 @@ def test_growth_since_matches_annual_factor():
     assert insights.growth_since(FIT, 0) == 0
 
 
+def test_footprint_units_and_plausibility():
+    f = insights.footprint(DF, g_co2_per_kwh=500, water_l_per_kwh=2.0)
+    r = f.iloc[0]
+    kwh = r["Training power draw (W)"] * r["Training time (hours)"] / 1000
+    assert np.isclose(r["energy_mwh"], kwh / 1000) and np.isclose(r["co2_t"], kwh * 500 / 1e6)
+    assert np.isclose(r["water_l"], kwh * 2.0)
+    assert (f["flop_per_joule"].dropna() <= insights.MAX_FLOP_PER_JOULE).all()
+    zero = insights.footprint(DF, 0, 0)
+    assert (zero["co2_t"] == 0).all() and (zero["water_l"] == 0).all()
+
+
+def test_leaderboard_running_record():
+    from utils.data_loader import frontier_by_year
+    top = frontier_by_year(DF)
+    assert top["record_to_date"].is_monotonic_increasing, "the record never goes down"
+    assert (top.loc[~top["new_record"], COMPUTE_COL] <= top["record_to_date"].shift()[~top["new_record"]]).all()
+    assert (top.loc[top["new_record"], "growth"].dropna() > 1).all()
+
+
+def test_sci_compact():
+    from ui.filters import sci_compact
+    assert sci_compact(1.0001e27) == "10²⁷" and sci_compact(3.14e23) == "3.1×10²³" and sci_compact(9.97e24) == "10²⁵"
+
+
 def test_downloader_changes():
     old = "Model,Publication date\nA,2020-01-01\nB,2021-01-01\n"
     new = "Model,Publication date\nB,2021-01-01\nC,2026-01-01\n"
