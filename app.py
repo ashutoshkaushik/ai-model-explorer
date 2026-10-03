@@ -10,6 +10,7 @@ page modules in lab/ only lay out UI.
 import streamlit as st
 
 from lab.app_pages import ask_page, explorer_page
+from lab.explore_pages import compare_page, cost_page, model_page, race_page
 from lab.home import home_page
 from lab.lab_pages import LAB_PAGES
 from lab.nav import PAGES, TOUR
@@ -25,6 +26,11 @@ def main() -> None:
     pages = {
         "home": st.Page(home_page, title="Start here", icon=":material/home:", default=True),
         "explorer": st.Page(explorer_page, title="Explorer", icon=":material/insights:", url_path="explorer"),
+        "race": st.Page(race_page, title="The compute race", icon=":material/sprint:", url_path="race"),
+        "model": st.Page(model_page, title="Find a model", icon=":material/search:", url_path="model"),
+        "compare": st.Page(compare_page, title="Compare two models", icon=":material/compare_arrows:",
+                           url_path="compare"),
+        "cost": st.Page(cost_page, title="What training costs", icon=":material/payments:", url_path="cost"),
         "ask": st.Page(ask_page, title="Ask the Data", icon=":material/forum:", url_path="ask"),
         "timeline": st.Page(timeline_page, title="Milestones timeline", icon=":material/timeline:", url_path="timeline"),
         "leaderboard": st.Page(leaderboard_page, title="Frontier leaderboard", icon=":material/leaderboard:",
@@ -38,8 +44,8 @@ def main() -> None:
         pages[key] = st.Page(fn, title=title, icon=icon, url_path=key.replace("_", "-"))
     PAGES.update(pages)
     page = st.navigation({
-        "App": [pages["home"], pages["explorer"], pages["ask"]],
-        "Overview": [pages["timeline"], pages["leaderboard"], pages["browse"], pages["about"]],
+        "App": [pages["home"], pages["explorer"], pages["race"], pages["model"], pages["compare"], pages["ask"]],
+        "Overview": [pages["timeline"], pages["leaderboard"], pages["cost"], pages["browse"], pages["about"]],
         "Explorer Lab · built step by step": [pages[k] for k in TOUR],
         "Surprise me": [pages["surprise"]],
     }, expanded=True)  # always show every page; no "View more" in the sidebar

@@ -1,5 +1,9 @@
 """'Start here': the one-picture idea of the whole app, then where to go next."""
 
+import html
+import time
+
+import pandas as pd
 import streamlit as st
 
 from lab.nav import go_button
@@ -7,6 +11,9 @@ from ui import chrome
 from ui.filters import base, sci
 from utils.charts import fit_growth
 from utils.data_loader import COMPUTE_COL, DATE_COL, MODEL_COL
+from utils.insights import growth_per_second, growth_since, load_changes, recent_models
+
+ALEXNET_FLOP = 4.7e17  # fallback if AlexNet is ever missing from the data
 
 ERAS = [  # (name, first year, last year, one line on what changed)
     ("Pre-deep learning", None, 2009, "Perceptrons, expert systems, early neural nets. Compute roughly followed Moore's law."),
@@ -33,6 +40,46 @@ def ladder_html(df) -> str:
     return f"<div class='ladder'>{''.join(rungs)}</div>"
 
 
+@st.fragment(run_every="1s")
+def live_counter(fit, alexnet_flop: float, record_flop: float, record_name: str) -> None:
+    """Ticks every second: how much the compute trend has grown since this visitor opened the page."""
+    opened = st.session_state.setdefault("opened_at", time.time())
+    seconds = time.time() - opened
+    grown = growth_since(fit, seconds) * 100
+    per_second = record_flop * growth_per_second(fit)
+    mins, secs = divmod(int(seconds), 60)
+    st.markdown(
+        "<div class='live'>"
+        f"<div class='tick'>+{grown:.7f}%</div>"
+        f"<div class='lede'>How much the training-compute trend has grown since you opened this page "
+        f"<span class='badge data'>{mins}m {secs:02d}s ago</span>. If the largest run so far ({html.escape(record_name)}) "
+        f"kept growing at {fit.factor_per_year:.1f}× per year, it would add about "
+        f"<b>{per_second / alexnet_flop:,.0f} AlexNets</b> of training compute every second. "
+        "</div></div>", unsafe_allow_html=True)
+
+
+def whats_new(df) -> None:
+    newest = df[DATE_COL].max()
+    recent = recent_models(df, days=90)
+    st.markdown("#### What's new in the data")
+    st.markdown(f"<div class='muted'>Snapshot runs to <b>{newest:%B %-d, %Y}</b>. {len(recent)} models were published "
+                "in its last 90 days; the latest are below.</div>", unsafe_allow_html=True)
+    cards = []
+    for _, r in recent.head(6).iterrows():
+        compute = f" · {sci(r[COMPUTE_COL])} FLOP" if pd.notna(r[COMPUTE_COL]) else ""
+        cards.append(f"<div class='nugget'><div class='tag'>{r[DATE_COL]:%b %-d, %Y}</div>"
+                     f"<b>{html.escape(r[MODEL_COL])}</b><span>{html.escape(r['primary_org'])} · "
+                     f"{html.escape(r['primary_domain'])}{compute}</span></div>")
+    st.markdown(f"<div class='nuggets three'>{''.join(cards)}</div>", unsafe_allow_html=True)
+    changes = load_changes()
+    if changes and changes.get("added"):
+        added = changes["added"]
+        st.markdown(f"<div class='callout'><b>{len(added)} models added</b> in the last data refresh "
+                    f"({changes['refreshed']}): " + ", ".join(html.escape(m) for m in added[:12])
+                    + (f" and {len(added) - 12} more" if len(added) > 12 else "") + ".</div>",
+                    unsafe_allow_html=True)
+
+
 def home_page() -> None:
     b = base()
     df = b["df_all"]
@@ -57,9 +104,34 @@ def home_page() -> None:
     k4.metric("Largest training run", sci(biggest[COMPUTE_COL]), border=True,
               help=f"FLOP · {biggest[MODEL_COL]} ({biggest['primary_org']}, {biggest[DATE_COL]:%b %Y})")
 
+    if fit:
+        st.markdown("#### Happening right now")
+        alexnet = df.loc[df[MODEL_COL] == "AlexNet", COMPUTE_COL]
+        live_counter(fit, float(alexnet.iloc[0]) if alexnet.notna().any() else ALEXNET_FLOP,
+                     float(biggest[COMPUTE_COL]), biggest[MODEL_COL])
+
     st.markdown("#### Three eras of AI, in one dataset")
     st.markdown(ladder_html(df), unsafe_allow_html=True)
     chrome.credit()
+
+    whats_new(df)
+    chrome.credit()
+
+    st.markdown("#### Start exploring")
+    a, b, c = st.columns(3)
+    with a:
+        go_button("race", "▶ Watch the compute race", primary=True)
+    with b:
+        go_button("model", "Find a model")
+    with c:
+        go_button("compare", "Compare two models")
+    a, b, c = st.columns(3)
+    with a:
+        go_button("cost", "What training costs")
+    with b:
+        go_button("surprise", "Surprise me with a fact")
+    with c:
+        go_button("explorer", "Open the full explorer")
 
     st.markdown("#### Who does what in this app")
     st.markdown(
@@ -73,10 +145,8 @@ def home_page() -> None:
         "</div>", unsafe_allow_html=True)
 
     st.markdown("")
-    a, c, d = st.columns(3)
+    a, c = st.columns(2)
     with a:
-        go_button("explorer", "Open the explorer", primary=True)
-    with c:
         go_button("ask", "Ask the data")
-    with d:
+    with c:
         go_button("lab_data", "Tour the Explorer Lab")

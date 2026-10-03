@@ -9,7 +9,9 @@ Data: Epoch AI (CC-BY 4.0) — https://epoch.ai/data/notable-ai-models
 import argparse
 import csv
 import io
+import json
 import sys
+from datetime import date
 from pathlib import Path
 
 import requests
@@ -23,6 +25,7 @@ SOURCES = [
 ]
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "notable_ai_models.csv"
+CHANGES_PATH = DATA_PATH.parent / "changes.json"  # read by the app's "What's new" section
 TIMEOUT = 60
 
 
@@ -42,6 +45,17 @@ def summarize(text: str) -> None:
     print(f"Columns ({len(header)}):")
     for col in header:
         print(f"  - {col}")
+
+
+def model_names(text: str) -> set[str]:
+    return {row["Model"] for row in csv.DictReader(io.StringIO(text)) if row.get("Model")}
+
+
+def changes(old_text: str | None, new_text: str) -> dict:
+    """Which models a refresh added and removed, for the app's "What's new" section."""
+    old, new = model_names(old_text) if old_text else set(), model_names(new_text)
+    return {"refreshed": date.today().isoformat(), "previous_rows": len(old), "rows": len(new),
+            "added": sorted(new - old), "removed": sorted(old - new)}
 
 
 def download(url: str) -> str:
@@ -72,8 +86,13 @@ def main() -> int:
         if not looks_like_csv(text):
             print("  failed: response does not look like a CSV (HTML or empty body)")
             continue
+        old_text = DATA_PATH.read_text(encoding="utf-8") if DATA_PATH.exists() else None
         DATA_PATH.write_text(text, encoding="utf-8")
         print(f"  saved to {DATA_PATH}")
+        if old_text:
+            diff = changes(old_text, text)
+            CHANGES_PATH.write_text(json.dumps(diff, indent=1), encoding="utf-8")
+            print(f"  {len(diff['added'])} models added, {len(diff['removed'])} removed (see {CHANGES_PATH.name})")
         summarize(text)
         return 0
 

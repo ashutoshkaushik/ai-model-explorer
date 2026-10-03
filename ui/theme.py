@@ -138,6 +138,16 @@ def apply_theme() -> None:
   .nugget b {{ display: block; font-family: var(--font-heading); font-size: 1.02rem; margin-bottom: .25rem; }}
   .nugget span {{ font-size: .87rem; line-height: 1.45; color: var(--muted); }}
 
+  .nuggets.three {{ grid-template-columns: repeat(3, 1fr); }}
+  @media (max-width: 900px) {{ .nuggets.three {{ grid-template-columns: 1fr; }} }}
+
+  /* ---- Live counter (Start here) */
+  .live {{ border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: .6rem;
+           background: var(--card); padding: .9rem 1.2rem; margin: .3rem 0 1rem; }}
+  .live .tick {{ font-family: var(--font-heading); font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 600;
+                 color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }}
+  .live .lede {{ font-size: 1rem; margin-top: .3rem; }}
+
   /* ---- Surprise me (lab/surprise.py) */
   .fact {{ border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: .8rem;
            background: var(--card); padding: 1.6rem 1.8rem 1.3rem; margin: .4rem 0 1rem; }}

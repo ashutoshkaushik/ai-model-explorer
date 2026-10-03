@@ -5,10 +5,13 @@ An interactive Streamlit app for exploring how AI models have grown from 1950 to
 **Pages** (sidebar navigation, light and dark themes that follow your system setting):
 
 - **App**
-  - **Start here:** headline numbers, the three eras of AI, and where to go next.
+  - **Start here:** headline numbers, a **live counter** of how much the compute trend has grown since you opened the page, the three eras of AI, **What's new** in the data (the latest models, plus what the last refresh added), and where to go next.
   - **Explorer:** a log-scale **Compute Over Time** scatter. You can switch the y-axis between training compute, parameters, and cost. It includes a fitted growth trend (about 4.3× per year since 2010), shaded eras, and milestone markers, followed by breakdown charts: top organizations, models per year by domain, and open vs. closed weights.
+  - **The compute race:** an animated bar race of the ten largest training runs so far, year by year. Press play and watch the record grow by hundreds of millions of times.
+  - **Find a model:** pick any model for a profile card: its rank that year, percentile, how far above or below the trend line it sits, a spotlight chart, and the most similar models. The URL updates, so you can share a link to any model.
+  - **Compare two models:** side by side, with a headline like "GPT-3 used 668,085× the training compute of AlexNet" and a ratio chart for compute, parameters and cost.
   - **Ask the Data:** plain-English questions answered by Claude through **tool use**. Claude chooses one of 9 safe, predefined query functions, the app runs it on the filtered data, and Claude summarizes the result. It never generates or executes code. An **Era Summary** button writes a short narrative of the selected period.
-- **Overview:** Milestones timeline, Frontier leaderboard, Browse the data (search + CSV export), and How it's built.
+- **Overview:** Milestones timeline, Frontier leaderboard, **What training costs** (cost per run over time against familiar price tags like a US home or a Hollywood film), Browse the data (search + CSV export), and How it's built.
 - **Explorer Lab · built step by step:** six pages, one per build step (cleaning, log scales, the growth fit, stable filter colours, milestones, safe tool use). Each has a live experiment, the key code read from the source, lessons learned, and knowledge nuggets.
 - **Surprise me:** 25 curated AI facts, each posed as a question you reveal, with next / previous / shuffle.
 - **Sidebar filters** (year range, domain, organization, accessibility, frontier-only) apply to every chart, table, and LLM query, and carry over between pages.
@@ -49,6 +52,8 @@ Without an API key, every tab except Ask the Data works normally.
 ```bash
 python tests/test_growth.py   # growth-rate fit
 python tests/test_llm.py      # query functions + tool-use loop with a fake client
+python tests/test_insights.py # profiles, comparisons, race frames, downloader change log
+python tests/test_surprise.py # the 25 static facts
 ```
 
 ## Architecture
@@ -59,6 +64,7 @@ flowchart LR
         E[epoch.ai CSV] -->|primary| DL
         D[DataHub mirror] -->|fallback| DL
         DL[scripts/download_data.py] --> CSV[(data/notable_ai_models.csv)]
+        DL -->|on --force refresh| CHG[(data/changes.json)]
         MS[(data/milestones.csv)]
     end
 
@@ -66,6 +72,7 @@ flowchart LR
         LOAD["data_loader.py<br/>@st.cache_data load + clean<br/>apply_filters, helpers"]
         CH["charts.py<br/>Plotly figures, growth fit<br/>light/dark aware"]
         LLM["llm.py<br/>9 safe query functions<br/>Claude tool use"]
+        INS["insights.py<br/>profiles, similar models,<br/>race frames, live growth"]
     end
 
     subgraph ui["ui/ (shared chrome)"]
@@ -75,7 +82,7 @@ flowchart LR
     end
 
     subgraph pages["lab/ (pages)"]
-        P1["App<br/>home.py, app_pages.py"]
+        P1["App<br/>home.py, app_pages.py,<br/>explore_pages.py"]
         P2["Overview<br/>overview.py"]
         P3["Explorer Lab<br/>lab_pages.py"]
         P4["Surprise me<br/>surprise.py (25 static facts)"]
@@ -83,6 +90,7 @@ flowchart LR
 
     CSV --> LOAD
     MS --> LOAD
+    CHG --> INS
     APP["app.py<br/>st.navigation"] --> pages
     APP --> TH
     APP --> CR
@@ -90,6 +98,8 @@ flowchart LR
     FL -->|filtered df| P1
     FL -->|filtered df| P2
     P1 --> CH
+    P1 --> INS
+    P2 --> INS
     P2 --> CH
     P3 --> CH
     P3 -->|run tools locally| LLM
@@ -103,6 +113,7 @@ flowchart LR
 |---|---|
 | `app.py` | Streamlit entry point: registers the pages in the App / Overview / Explorer Lab / Surprise me groups |
 | `lab/home.py`, `lab/app_pages.py` | App: Start here, Explorer, Ask the Data |
+| `lab/explore_pages.py` | The compute race, Find a model, Compare two models, What training costs |
 | `lab/overview.py` | Overview: milestones timeline, frontier leaderboard, data browser, how it's built |
 | `lab/lab_pages.py` | Explorer Lab: six build steps with live experiments, key code and knowledge nuggets |
 | `lab/surprise.py` | Surprise me: 25 hand-written AI facts, one at a time |
@@ -111,9 +122,10 @@ flowchart LR
 | `ui/filters.py` | Sidebar filters shared by every data page |
 | `ui/chrome.py` | Author card with LinkedIn link, footer, data credit |
 | `utils/data_loader.py` | Cached loading/cleaning, filters, milestone and leaderboard helpers |
-| `utils/charts.py` | All Plotly chart builders and the log-linear growth fit |
+| `utils/charts.py` | All Plotly chart builders (including the animated race) and the log-linear growth fit |
+| `utils/insights.py` | Model profiles, similar models, comparisons, race frames, live growth, "what's new" |
 | `utils/llm.py` | Anthropic client, safe query functions, tool-use loop, era summary |
-| `scripts/download_data.py` | Dataset download with fallback and CSV validation |
+| `scripts/download_data.py` | Dataset download with fallback and CSV validation; on refresh, records added/removed models in `data/changes.json` |
 | `data/milestones.csv` | Curated AI milestones (date, title, description) |
 | `tests/` | Offline sanity tests |
 

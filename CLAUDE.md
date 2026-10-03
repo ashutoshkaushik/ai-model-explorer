@@ -39,15 +39,18 @@ Derived columns added by `load_data()`: `year` (int), `primary_org` / `primary_d
 python tests/test_growth.py   # growth-rate fit
 python tests/test_llm.py      # query functions + tool-use loop (fake client, no API calls)
 python tests/test_surprise.py # the 25 static facts
+python tests/test_insights.py # model profiles, compare, race frames, downloader change log
 ```
 
 ## Conventions
 - Plotly (`plotly.express` / `graph_objects`) for all charts.
 - All chart functions live in `utils/charts.py`; they take a DataFrame and return a `go.Figure`.
-- App structure (same as the AI History RAG and Travel Agent Lab projects): `app.py` only registers pages with `st.navigation` in four groups: **App** (`lab/home.py`, `lab/app_pages.py`), **Overview** (`lab/overview.py`), **Explorer Lab** (`lab/lab_pages.py`, order in `lab/nav.TOUR`), **Surprise me** (`lab/surprise.py`, 25 static facts; never generate them at run time). `ui/chrome.py` adds the author card + LinkedIn link at the sidebar bottom and the footer on every page.
+- App structure (same as the AI History RAG and Travel Agent Lab projects): `app.py` only registers pages with `st.navigation` in four groups: **App** (`lab/home.py`, `lab/app_pages.py`, `lab/explore_pages.py`: race, find a model, compare), **Overview** (`lab/overview.py`, plus the cost page from `lab/explore_pages.py`), **Explorer Lab** (`lab/lab_pages.py`, order in `lab/nav.TOUR`), **Surprise me** (`lab/surprise.py`, 25 static facts; never generate them at run time). `ui/chrome.py` adds the author card + LinkedIn link at the sidebar bottom and the footer on every page.
 - Theme: `.streamlit/config.toml` (Claude-style light + dark, terracotta accent, Source Serif 4 headings, Hanken Grotesk body) and `ui/theme.py` (CSS tokens + shared classes: `hero`, `lede`, `eyebrow`, `badge`, `steps`, `ladder`, `learnbox`, `ltable`). Never hard-code colours in pages.
 - Data pages call `ui.filters.sidebar_filters()` to draw the shared sidebar filters and get the filtered `df`; filter values persist across pages via `filters.keep_state()`.
-- Data loading goes through `@st.cache_data` functions in `utils/data_loader.py`.
+- Data loading goes through `@st.cache_data` functions in `utils/data_loader.py`. The source CSV has double-encoded UTF-8 (`UniversitÃ©`); `load_data()` repairs it with `_fix_mojibake`, so always load through it.
+- Derived per-model facts (profiles, similar models, comparisons, race frames, live growth, what's new) live in `utils/insights.py`: pure pandas, no Streamlit, tested in `tests/test_insights.py`.
+- `scripts/download_data.py --force` writes `data/changes.json` (models added/removed); the Start page's What's new reads it.
 - Split comma-separated multi-value columns (`str.split(",")` + `explode`) before grouping by org/domain.
 - Never hardcode API keys. Read `ANTHROPIC_API_KEY` from `st.secrets` (`.streamlit/secrets.toml`, gitignored) or the environment; see `utils/llm.py`.
 - Never execute LLM-generated code. Ask the Data only dispatches to the functions registered in `utils/llm.QUERIES`; add new capabilities there.

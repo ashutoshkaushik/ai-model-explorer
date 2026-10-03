@@ -27,6 +27,22 @@ def _first_value(series: pd.Series) -> pd.Series:
     return series.fillna("Unknown").str.split(",").str[0].str.strip().replace("", "Unknown")
 
 
+def _fix_mojibake(text):
+    """'UniversitÃ© de MontrÃ©al' -> 'Université de Montréal'.
+
+    The published CSV has some UTF-8 text that was decoded as Latin-1/Windows-1252 and re-encoded. Undo that
+    per value, and keep the original whenever the round trip doesn't produce valid UTF-8.
+    """
+    if not isinstance(text, str) or ("Ã" not in text and "Â" not in text):
+        return text
+    for codec in ("latin-1", "cp1252"):
+        try:
+            return text.encode(codec).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+    return text
+
+
 def _open_status(access: pd.Series) -> pd.Series:
     status = pd.Series("Closed", index=access.index)
     status[access.str.startswith("Open weights", na=False)] = "Open"
@@ -37,6 +53,8 @@ def _open_status(access: pd.Series) -> pd.Series:
 @st.cache_data
 def load_data() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH)
+    for col in df.select_dtypes(include=["object", "string"]).columns:
+        df[col] = df[col].map(_fix_mojibake)
     df[DATE_COL] = pd.to_datetime(df[DATE_COL], errors="coerce")
     df = df.dropna(subset=[DATE_COL])
     df["year"] = df[DATE_COL].dt.year.astype(int)
