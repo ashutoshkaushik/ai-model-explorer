@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from ui import theme
 from utils.data_loader import (
     COMPUTE_COL,
     COST_COL,
@@ -17,12 +18,29 @@ from utils.data_loader import (
     PARAMS_COL,
 )
 
-# Categorical palette (validated for CVD separation on a dark surface), assigned in fixed order.
-PALETTE = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
+# Categorical palettes (validated for CVD separation on each surface), assigned in fixed order.
+# They mirror chartCategoricalColors in .streamlit/config.toml; the site follows the visitor's light/dark setting.
+PALETTE_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+PALETTE_DARK = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
 OTHER_COLOR = "#8a8984"
-TEXT_MUTED = "#c3c2b7"
-GRID = "rgba(255,255,255,0.08)"
 MAX_SERIES = 7  # beyond this, fold into "Other"
+
+# Chart-only colours per mode; surface/ink/muted come from ui.theme so charts match the page.
+CHART = {
+    "light": {"grid": "rgba(31,30,29,0.08)", "era": ("rgba(31,30,29,0)", "rgba(31,30,29,0.03)", "rgba(31,30,29,0.06)"),
+              "rule": "rgba(31,30,29,0.30)", "label_bg": "rgba(250,249,245,0.85)", "hover_bg": "#ffffff"},
+    "dark": {"grid": "rgba(242,240,232,0.08)", "era": ("rgba(242,240,232,0)", "rgba(242,240,232,0.035)", "rgba(242,240,232,0.07)"),
+             "rule": "rgba(242,240,232,0.35)", "label_bg": "rgba(38,38,36,0.80)", "hover_bg": "#30302E"},
+}
+
+
+def palette() -> list[str]:
+    return PALETTE_DARK if theme.mode() == "dark" else PALETTE_LIGHT
+
+
+def chart_tokens() -> dict:
+    """Page tokens (surface, ink, muted) plus chart-only colours, for the current light/dark mode."""
+    return {**theme.tokens(), **CHART[theme.mode()]}
 
 METRICS = {
     "Training compute": {"col": COMPUTE_COL, "unit": "FLOP", "noun": "Compute grows"},
@@ -32,19 +50,20 @@ METRICS = {
 
 
 def _base_layout(fig: go.Figure, title: str | None = None, height: int = 420) -> go.Figure:
+    t = chart_tokens()
     fig.update_layout(
-        template="plotly_dark",
-        title=title,
+        template="plotly_dark" if theme.mode() == "dark" else "plotly_white",
+        title=dict(text=title, font=dict(family=theme.FONT_HEADING, size=17, color=t["ink"])) if title else None,
         height=height,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=TEXT_MUTED),
+        font=dict(family=theme.FONT_BODY, color=t["muted"]),
         margin=dict(l=10, r=10, t=50 if title else 20, b=10),
         legend=dict(bgcolor="rgba(0,0,0,0)"),
-        hoverlabel=dict(bgcolor="#242422"),
+        hoverlabel=dict(bgcolor=t["hover_bg"], font=dict(family=theme.FONT_BODY, color=t["ink"])),
     )
-    fig.update_xaxes(gridcolor=GRID, zeroline=False)
-    fig.update_yaxes(gridcolor=GRID, zeroline=False)
+    fig.update_xaxes(gridcolor=t["grid"], linecolor=t["line"], zeroline=False)
+    fig.update_yaxes(gridcolor=t["grid"], linecolor=t["line"], zeroline=False)
     return fig
 
 
@@ -55,7 +74,7 @@ def color_map(categories: list[str]) -> dict[str, str]:
         if cat in ("Other", "Unknown"):
             colors[cat] = OTHER_COLOR
         else:
-            colors[cat] = PALETTE[i % len(PALETTE)]
+            colors[cat] = palette()[i % len(palette())]
             i += 1
     return colors
 
@@ -100,25 +119,26 @@ def fit_growth(df: pd.DataFrame, value_col: str, start_year: int = 2010) -> Grow
 # --- Compute over time -----------------------------------------------------------------------
 
 
-ERAS = [
-    ("Pre-Deep<br>Learning", None, "2010-01-01", "rgba(255,255,255,0.0)"),
-    ("Deep<br>Learning", "2010-01-01", "2018-01-01", "rgba(255,255,255,0.035)"),
-    ("Large-Scale<br>/ LLM Era", "2018-01-01", None, "rgba(255,255,255,0.07)"),
+ERAS = [  # (label, start, end, index into the mode's era fills)
+    ("Pre-Deep<br>Learning", None, "2010-01-01", 0),
+    ("Deep<br>Learning", "2010-01-01", "2018-01-01", 1),
+    ("Large-Scale<br>/ LLM Era", "2018-01-01", None, 2),
 ]
 
 
 def add_eras(fig: go.Figure, x_min: pd.Timestamp, x_max: pd.Timestamp) -> None:
     """Shade the three eras (clipped to the visible date range) and label each at the bottom."""
+    t = chart_tokens()
     for name, start, end, fill in ERAS:
         x0 = max(pd.Timestamp(start), x_min) if start else x_min
         x1 = min(pd.Timestamp(end), x_max) if end else x_max
         if x0 >= x1:
             continue
-        fig.add_vrect(x0=x0, x1=x1, fillcolor=fill, line_width=0, layer="below")
+        fig.add_vrect(x0=x0, x1=x1, fillcolor=t["era"][fill], line_width=0, layer="below")
         fig.add_annotation(
             x=x0, y=0, xref="x", yref="paper", text=name, showarrow=False,
             xanchor="left", yanchor="bottom", xshift=4, yshift=4, align="left",
-            font=dict(size=11, color=TEXT_MUTED),
+            font=dict(size=11, color=t["muted"]),
         )
 
 
@@ -128,21 +148,22 @@ def add_milestones(fig: go.Figure, milestones: pd.DataFrame, x_min: pd.Timestamp
     Rotated text labels are drawn only where they won't collide with the previous label;
     crowded milestones remain identifiable via hover.
     """
+    t = chart_tokens()
     m = milestones[milestones["date"].between(x_min, x_max)]
     min_gap = (x_max - x_min) * 0.028
     last_labeled = None
     for _, row in m.iterrows():
         fig.add_shape(
             type="line", x0=row["date"], x1=row["date"], y0=0, y1=1, xref="x", yref="paper",
-            line=dict(color="rgba(255,255,255,0.35)", width=1, dash="dash"), layer="below",
+            line=dict(color=t["rule"], width=1, dash="dash"), layer="below",
         )
         roomy = last_labeled is None or row["date"] - last_labeled >= min_gap
         fig.add_annotation(
             x=row["date"], y=1, xref="x", yref="paper", yanchor="top",
             text=row["title"] if roomy else "◆", textangle=-90 if roomy else 0,
             showarrow=False, xshift=-7 if roomy else 0,
-            font=dict(size=10, color="#ffffff" if roomy else TEXT_MUTED),
-            bgcolor="rgba(26,26,25,0.75)" if roomy else None,
+            font=dict(size=10, color=t["ink"] if roomy else t["muted"]),
+            bgcolor=t["label_bg"] if roomy else None,
             hovertext=f"<b>{row['title']}</b> ({row['date']:%b %Y})<br>{row['description']}",
         )
         if roomy:
@@ -187,7 +208,7 @@ def over_time_scatter(
                     size=s["size"],
                     color=colors[dom],
                     opacity=0.8,
-                    line=dict(width=1, color="#1a1a19"),
+                    line=dict(width=1, color=chart_tokens()["surface"]),
                 ),
                 customdata=np.stack(
                     [s[MODEL_COL], s["primary_org"], s[COMPUTE_COL], s[PARAMS_COL], s["primary_domain"]], axis=-1
@@ -211,7 +232,7 @@ def over_time_scatter(
                 y=ys,
                 mode="lines",
                 name=f"Trend since {fit.start_year} (~{fit.factor_per_year:.1f}×/yr)",
-                line=dict(color="#ffffff", width=2.5, dash="dash"),
+                line=dict(color=chart_tokens()["ink"], width=2.5, dash="dash"),
                 hoverinfo="skip",
             )
         )
@@ -230,7 +251,8 @@ def over_time_scatter(
 
 # --- Breakdown charts ------------------------------------------------------------------------
 
-OPEN_COLORS = {"Open": PALETTE[0], "Closed": PALETTE[1], "Unknown": OTHER_COLOR}
+def open_colors() -> dict[str, str]:
+    return {"Open": palette()[0], "Closed": palette()[1], "Unknown": OTHER_COLOR}
 
 
 def top_orgs_bar(df: pd.DataFrame, n: int = 10) -> go.Figure:
@@ -240,10 +262,10 @@ def top_orgs_bar(df: pd.DataFrame, n: int = 10) -> go.Figure:
             x=counts.values,
             y=counts.index,
             orientation="h",
-            marker=dict(color=PALETTE[0], cornerradius=4),
+            marker=dict(color=palette()[0], cornerradius=4),
             text=counts.values,
             textposition="outside",
-            textfont=dict(color=TEXT_MUTED),
+            textfont=dict(color=chart_tokens()["muted"]),
             cliponaxis=False,
             hovertemplate="<b>%{y}</b><br>%{x} models<extra></extra>",
         )
@@ -288,7 +310,7 @@ def open_donut(df: pd.DataFrame) -> go.Figure:
             values=counts.values,
             hole=0.6,
             sort=False,
-            marker=dict(colors=[OPEN_COLORS[k] for k in counts.index], line=dict(color="#1a1a19", width=2)),
+            marker=dict(colors=[open_colors()[k] for k in counts.index], line=dict(color=chart_tokens()["surface"], width=2)),
             textinfo="label+percent",
             hovertemplate="<b>%{label}</b><br>%{value} models (%{percent})<extra></extra>",
         )
@@ -313,8 +335,8 @@ def open_share_line(df: pd.DataFrame, min_models: int = 5) -> go.Figure | None:
             x=share.index,
             y=share.values,
             mode="lines+markers",
-            line=dict(color=PALETTE[0], width=2),
-            marker=dict(size=8, line=dict(width=2, color="#1a1a19")),
+            line=dict(color=palette()[0], width=2),
+            marker=dict(size=8, line=dict(width=2, color=chart_tokens()["surface"])),
             customdata=np.stack([by_year["open"], by_year["total"]], axis=-1),
             hovertemplate="%{x}: %{y:.0%} open (%{customdata[0]} of %{customdata[1]})<extra></extra>",
         )
@@ -334,8 +356,8 @@ def leaderboard_step(top: pd.DataFrame) -> go.Figure:
             x=top["year"],
             y=top[COMPUTE_COL],
             mode="lines+markers",
-            line=dict(color=PALETTE[0], width=2, shape="hv"),
-            marker=dict(size=8, line=dict(width=2, color="#1a1a19")),
+            line=dict(color=palette()[0], width=2, shape="hv"),
+            marker=dict(size=8, line=dict(width=2, color=chart_tokens()["surface"])),
             customdata=np.stack([top[MODEL_COL], top["primary_org"]], axis=-1),
             hovertemplate="<b>%{x}: %{customdata[0]}</b><br>%{customdata[1]}<br>%{y:.2e} FLOP<extra></extra>",
         )

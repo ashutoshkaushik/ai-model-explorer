@@ -42,12 +42,15 @@ python tests/test_llm.py      # query functions + tool-use loop (fake client, no
 
 ## Conventions
 - Plotly (`plotly.express` / `graph_objects`) for all charts.
-- All chart functions live in `utils/charts.py`; they take a DataFrame and return a `go.Figure`. `app.py` only lays out UI.
+- All chart functions live in `utils/charts.py`; they take a DataFrame and return a `go.Figure`.
+- App structure (same as the AI History RAG and Travel Agent Lab projects): `app.py` only registers pages with `st.navigation` in three groups: **App** (`lab/home.py`, `lab/app_pages.py`), **Overview** (`lab/overview.py`), **Explorer Lab** (`lab/lab_pages.py`, order in `lab/nav.TOUR`). `ui/chrome.py` adds the author card + LinkedIn link at the sidebar bottom and the footer on every page.
+- Theme: `.streamlit/config.toml` (Claude-style light + dark, terracotta accent, Source Serif 4 headings, Hanken Grotesk body) and `ui/theme.py` (CSS tokens + shared classes: `hero`, `lede`, `eyebrow`, `badge`, `steps`, `ladder`, `learnbox`, `ltable`). Never hard-code colours in pages.
+- Data pages call `ui.filters.sidebar_filters()` to draw the shared sidebar filters and get the filtered `df`; filter values persist across pages via `filters.keep_state()`.
 - Data loading goes through `@st.cache_data` functions in `utils/data_loader.py`.
 - Split comma-separated multi-value columns (`str.split(",")` + `explode`) before grouping by org/domain.
 - Never hardcode API keys. Read `ANTHROPIC_API_KEY` from `st.secrets` (`.streamlit/secrets.toml`, gitignored) or the environment; see `utils/llm.py`.
 - Never execute LLM-generated code. Ask the Data only dispatches to the functions registered in `utils/llm.QUERIES`; add new capabilities there.
 - Every chart, table, and LLM call uses the sidebar-filtered `df`. Handle empty results with a friendly message.
-- Chart colors: use `PALETTE` / `color_map` in `utils/charts.py` (fixed order, validated palette). Assign domain colors from the unfiltered data so filters never repaint a series; fold beyond 7 series into gray "Other".
+- Chart colors: use `palette()` / `color_map` / `chart_tokens()` in `utils/charts.py` (they follow the light/dark mode) (fixed order, validated palette). Assign domain colors from the unfiltered data so filters never repaint a series; fold beyond 7 series into gray "Other".
 - Every page/chart area credits: **"Data: Epoch AI (CC-BY 4.0)"**.
 - Dependencies are pinned in `requirements.txt`.

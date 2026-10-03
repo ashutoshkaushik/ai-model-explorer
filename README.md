@@ -2,13 +2,15 @@
 
 An interactive Streamlit app for exploring how AI models have grown from 1950 to today: training compute, parameter counts, training cost, openness, and who builds them. It uses Epoch AI's [Notable AI Models](https://epoch.ai/data/notable-ai-models) dataset (1,000+ models).
 
-**Features**
+**Pages** (sidebar navigation, light and dark themes that follow your system setting):
 
-- **Overview:** KPI cards and a log-scale **Compute Over Time** scatter. You can switch the y-axis between training compute, parameters, and cost. The scatter includes a fitted growth trend (compute has grown about 4.3× per year since 2010), shaded eras, and milestone markers. Below it are breakdown charts: top organizations, models per year by domain, and open vs. closed weights. A searchable table with CSV export finishes the tab.
-- **Timeline:** 16 AI milestones from the Perceptron (1958) to the first 10²⁷ FLOP model (2026). Each shows the highest-compute models released within ±6 months of it.
-- **Frontier Leaderboard:** the highest-compute model for each year, as a step chart and a table.
-- **Ask the Data:** plain-English questions answered by Claude through **tool use**. Claude chooses one of 9 safe, predefined query functions, the app runs it on the filtered data, and Claude summarizes the result. It never generates or executes code. An **Era Summary** button writes a short narrative of the selected period.
-- **Sidebar filters:** year range, domain, organization, accessibility, and frontier-only. They apply to every chart, table, and LLM query.
+- **App**
+  - **Start here:** headline numbers, the three eras of AI, and where to go next.
+  - **Explorer:** a log-scale **Compute Over Time** scatter. You can switch the y-axis between training compute, parameters, and cost. It includes a fitted growth trend (about 4.3× per year since 2010), shaded eras, and milestone markers, followed by breakdown charts: top organizations, models per year by domain, and open vs. closed weights.
+  - **Ask the Data:** plain-English questions answered by Claude through **tool use**. Claude chooses one of 9 safe, predefined query functions, the app runs it on the filtered data, and Claude summarizes the result. It never generates or executes code. An **Era Summary** button writes a short narrative of the selected period.
+- **Overview:** Milestones timeline, Frontier leaderboard, Browse the data (search + CSV export), and How it's built.
+- **Explorer Lab · built step by step:** six pages, one per build step (cleaning, log scales, the growth fit, stable filter colours, milestones, safe tool use). Each has a live experiment, the key code read from the source, and lessons learned.
+- **Sidebar filters** (year range, domain, organization, accessibility, frontier-only) apply to every chart, table, and LLM query, and carry over between pages.
 
 ## Screenshots
 
