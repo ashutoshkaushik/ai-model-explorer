@@ -9,6 +9,15 @@ An interactive Streamlit app that shows how AI models have grown from 1950 to to
 [AI History Research Assistant](https://ai-history-rag.streamlit.app/) (RAG) ·
 [Travel Agent Lab](https://ai-travel-agent.streamlit.app/) (multi-agent)
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Start here: the record training compute, 1950 → today](docs/screenshots/start-here.png) | ![Explorer: compute over time, with the growth trend and milestones](docs/screenshots/explorer.png) |
+| Start here: the record training compute, 1950 → today | Explorer: compute over time, with the growth trend and milestones |
+| ![The compute race: the ten largest training runs, year by year](docs/screenshots/compute-race.png) | ![Inside a forward pass: a real Llama 2 model, layer by layer](docs/screenshots/forward-pass.png) |
+| The compute race: the ten largest training runs, year by year | Inside a forward pass: a real Llama 2 model, layer by layer |
+
 ## What's inside
 
 The sidebar groups the pages. Light and dark themes follow your system setting.
