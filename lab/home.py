@@ -17,6 +17,7 @@ from utils.data_loader import COMPUTE_COL, DATE_COL, MODEL_COL
 from utils.insights import growth_per_second, growth_since, load_changes, recent_models
 
 ALEXNET_FLOP = 4.7e17  # fallback if AlexNet is ever missing from the data
+LIVE_SECONDS = 10  # the live counter ticks this long, then freezes
 
 ERAS = [  # (name, first year, last year, one line on what changed)
     ("Pre-deep learning", None, 2009, "Perceptrons, expert systems, early neural nets. Compute roughly followed Moore's law."),
@@ -140,26 +141,35 @@ def random_model_button(df: pd.DataFrame) -> None:
         st.switch_page(PAGES["model"], query_params={"model": name})
 
 
-@st.fragment(run_every="1s")
-def live_counter(fit, alexnet_flop: float, record_flop: float, record_name: str) -> None:
-    """Ticks every second: how much the compute trend has grown since this visitor opened the page."""
-    opened = st.session_state.setdefault("opened_at", time.time())
-    seconds = time.time() - opened
+def live_html(fit, alexnet_flop: float, record_flop: float, record_name: str, seconds: float, frozen: bool) -> str:
     grown = growth_since(fit, seconds) * 100
     per_second = record_flop * growth_per_second(fit)
     mins, secs = divmod(int(seconds), 60)
     added = record_flop * growth_since(fit, seconds) / alexnet_flop
-    st.markdown(
+    when = (f"in the first <span class='badge data'>{LIVE_SECONDS} seconds</span> after you opened this page"
+            if frozen else f"since you opened this page <span class='badge data'>{mins}m {secs:02d}s ago</span>")
+    return (
         "<div class='live'>"
-        f"<div class='live-row'><div><div class='live-k'><i class='live-dot'></i>Trend growth since you arrived</div>"
+        f"<div class='live-row'><div><div class='live-k'><i class='live-dot{' stopped' if frozen else ''}'></i>"
+        f"Trend growth {'in your first ' + str(LIVE_SECONDS) + 's' if frozen else 'since you arrived'}</div>"
         f"<div class='tick'>+{grown:.7f}%</div></div>"
         f"<div><div class='live-k'>AlexNets of compute added at the record's pace</div>"
         f"<div class='tick'>{added:,.0f}</div></div></div>"
-        f"<div class='lede'>How much the training-compute trend has grown since you opened this page "
-        f"<span class='badge data'>{mins}m {secs:02d}s ago</span>. If the largest run so far ({html.escape(record_name)}) "
-        f"kept growing at {fit.factor_per_year:.1f}× per year, it would add about "
+        f"<div class='lede'>How much the training-compute trend grew {when}. If the largest run so far "
+        f"({html.escape(record_name)}) kept growing at {fit.factor_per_year:.1f}× per year, it would add about "
         f"<b>{per_second / alexnet_flop:,.0f} AlexNets</b> of training compute every second. "
-        "</div></div>", unsafe_allow_html=True)
+        "</div></div>")
+
+
+@st.fragment(run_every="1s")
+def live_counter(*args) -> None:
+    """Ticks every second for LIVE_SECONDS after the visitor opens the page, then reruns the page once so
+    home_page() draws the frozen version and nothing keeps polling the server."""
+    seconds = time.time() - st.session_state.setdefault("opened_at", time.time())
+    if seconds >= LIVE_SECONDS:
+        st.session_state["live_done"] = True
+        st.rerun(scope="app")
+    st.markdown(live_html(*args, seconds, frozen=False), unsafe_allow_html=True)
 
 
 def whats_new(df) -> None:
@@ -209,8 +219,12 @@ def home_page() -> None:
     if fit:
         st.markdown("#### Happening right now")
         alexnet = df.loc[df[MODEL_COL] == "AlexNet", COMPUTE_COL]
-        live_counter(fit, float(alexnet.iloc[0]) if alexnet.notna().any() else ALEXNET_FLOP,
-                     float(biggest[COMPUTE_COL]), biggest[MODEL_COL])
+        args = (fit, float(alexnet.iloc[0]) if alexnet.notna().any() else ALEXNET_FLOP,
+                float(biggest[COMPUTE_COL]), biggest[MODEL_COL])
+        if st.session_state.get("live_done"):
+            st.markdown(live_html(*args, LIVE_SECONDS, frozen=True), unsafe_allow_html=True)
+        else:
+            live_counter(*args)
 
     st.markdown("#### Three eras of AI, in one dataset")
     st.markdown(ladder_html(df), unsafe_allow_html=True)

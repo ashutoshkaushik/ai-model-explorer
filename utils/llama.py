@@ -1,7 +1,8 @@
 """A numpy port of Karpathy's llama2.c (run.c), so the 'Inside a forward pass' page can show a real Llama 2 at work.
 
-It reads the same two files run.c reads, the checkpoint (stories15M.bin) and tokenizer.bin, from LLAMA2C_DIR
-(default ~/Projects/llama2.c). forward() mirrors run.c's forward() line for line and also records what happens
+It reads the same two files run.c reads, the checkpoint (stories15M.bin) and tokenizer.bin, plus run.c itself
+(for the page's code panel), from LLAMA2C_DIR (default ~/Projects/llama2.c). Where that folder doesn't have them,
+as on a deployed copy, download() fetches them once into DOWNLOAD_DIR. forward() mirrors run.c's forward() line for line and also records what happens
 inside (every attention weight, the vector x after each step), which the page animates. generate() mirrors
 run.c's generate(), including its xorshift random numbers, so the same seed gives the same story as ./run.
 
@@ -16,8 +17,16 @@ from pathlib import Path
 import numpy as np
 
 LLAMA2C_DIR = Path(os.environ.get("LLAMA2C_DIR", Path.home() / "Projects" / "llama2.c")).expanduser()
+DOWNLOAD_DIR = Path.home() / ".cache" / "llama2c"
 CHECKPOINT = "stories15M.bin"
 TOKENIZER = "tokenizer.bin"
+RUN_C = "run.c"
+LLAMA2C_COMMIT = "350e04fe35433e6d2941dce5a1f53308f87058eb"  # tokenizer.bin and run.c are pinned to this commit
+SOURCES = {
+    CHECKPOINT: "https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin",
+    TOKENIZER: f"https://raw.githubusercontent.com/karpathy/llama2.c/{LLAMA2C_COMMIT}/tokenizer.bin",
+    RUN_C: f"https://raw.githubusercontent.com/karpathy/llama2.c/{LLAMA2C_COMMIT}/run.c",
+}
 BOS, EOS = 1, 2
 HIDDEN_SHOWN = 96  # how many of the feed-forward's hidden units the trace keeps (all of x is kept)
 
@@ -132,13 +141,40 @@ class Tokenizer:
         return piece.replace("\n", "↵").replace(" ", "▁")
 
 
-def load(directory: Path = LLAMA2C_DIR) -> tuple[Model, Tokenizer]:
+def files_present(directory: Path) -> bool:
+    return (directory / CHECKPOINT).exists() and (directory / TOKENIZER).exists()
+
+
+def model_dir() -> Path | None:
+    """LLAMA2C_DIR if it has the model, else DOWNLOAD_DIR if a download finished, else None."""
+    return next((d for d in (LLAMA2C_DIR, DOWNLOAD_DIR) if files_present(d)), None)
+
+
+def download(directory: Path = DOWNLOAD_DIR) -> Path:
+    """Fetch the model (60 MB), tokenizer and run.c into `directory`, skipping files already there."""
+    import requests  # only needed on a machine without the files
+
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, url in SOURCES.items():
+        target = directory / name
+        if target.exists():
+            continue
+        partial = target.with_suffix(target.suffix + ".part")  # renamed only when complete
+        with requests.get(url, stream=True, timeout=60) as r:
+            r.raise_for_status()
+            with open(partial, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1 << 20):
+                    f.write(chunk)
+        partial.rename(target)
+    return directory
+
+
+def load(directory: Path | None = None) -> tuple[Model, Tokenizer]:
+    directory = directory or model_dir()
+    if directory is None:
+        raise FileNotFoundError(f"no {CHECKPOINT} in {LLAMA2C_DIR} or {DOWNLOAD_DIR}; call download() first")
     model = Model(directory / CHECKPOINT)
     return model, Tokenizer(directory / TOKENIZER, model.config.vocab_size)
-
-
-def files_present(directory: Path = LLAMA2C_DIR) -> bool:
-    return (directory / CHECKPOINT).exists() and (directory / TOKENIZER).exists()
 
 
 # --- The network: run.c's forward(), with a trace ------------------------------------------------

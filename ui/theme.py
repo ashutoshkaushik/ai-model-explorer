@@ -219,6 +219,7 @@ def apply_theme() -> None:
   .live-dot {{ display: inline-block; width: .55rem; height: .55rem; border-radius: 99px; background: var(--success);
                margin-right: .45rem; vertical-align: 1px; animation: live-pulse 1s ease-in-out infinite; }}
   @keyframes live-pulse {{ 50% {{ opacity: .25; }} }}
+  .live-dot.stopped {{ animation: none; background: var(--muted); }}
   @media (prefers-reduced-motion: reduce) {{ .live-dot {{ animation: none; }} }}
   .live .tick {{ font-family: var(--font-heading); font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 600;
                  color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }}

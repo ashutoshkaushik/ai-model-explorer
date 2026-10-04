@@ -18,7 +18,6 @@ from ui import theme
 from utils import llama
 
 TEMPLATE = Path(__file__).with_name("forward_pass.html")
-RUN_C = llama.LLAMA2C_DIR / "run.c"
 MAX_PROMPT_CHARS = 120
 CREDIT = ("Model: stories15M, trained on TinyStories, from Andrej Karpathy's "
           "<a href='https://github.com/karpathy/llama2.c' target='_blank' rel='noopener'>llama2.c</a> (MIT)")
@@ -42,14 +41,19 @@ STAGE_ANCHORS = [
 
 @st.cache_resource(show_spinner="Loading the 15M-parameter model…")
 def load_model():
+    if llama.model_dir() is None:
+        with st.spinner("First visit: downloading the 60 MB model from Hugging Face. This takes a few seconds…"):
+            llama.download()
     return llama.load()
 
 
 def run_c_code() -> dict | None:
     """forward()'s source lines from run.c, and the line range of each stage."""
-    if not RUN_C.exists():
+    directory = llama.model_dir()
+    run_c = directory / llama.RUN_C if directory else None
+    if run_c is None or not run_c.exists():
         return None
-    lines = RUN_C.read_text().splitlines()
+    lines = run_c.read_text().splitlines()
     start = next(i for i, line in enumerate(lines) if line.startswith("float* forward("))
     end = next(i for i in range(start, len(lines)) if lines[i] == "}")
     found, i = [], start
@@ -129,15 +133,13 @@ def forward_page() -> None:
                 "Watch each word travel through the network: the same six layers of attention and feed-forward maths "
                 "that run inside Llama 2 7B, only narrower.</div>", unsafe_allow_html=True)
 
-    if not llama.files_present():
-        st.warning(f"The model files aren't on this computer yet. This page reads `{llama.CHECKPOINT}` and "
-                   f"`{llama.TOKENIZER}` from `{llama.LLAMA2C_DIR}` (set `LLAMA2C_DIR` to use another folder).",
-                   icon=":material/download:")
-        st.code("git clone https://github.com/karpathy/llama2.c.git ~/Projects/llama2.c\ncd ~/Projects/llama2.c\n"
-                "curl -L -O https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin", language="bash")
+    try:
+        model, tok = load_model()
+    except Exception as e:  # no network, or Hugging Face is down
+        st.error(f"Couldn't download the model ({e}). Reload the page to try again, or put `{llama.CHECKPOINT}` "
+                 f"and `{llama.TOKENIZER}` in `{llama.LLAMA2C_DIR}` (or set `LLAMA2C_DIR`).",
+                 icon=":material/cloud_off:")
         return
-
-    model, tok = load_model()
     with st.form("fp_form", border=False):
         a, b, c, d = st.columns([5, 2, 2, 1.4], vertical_alignment="bottom")
         prompt = a.text_input("Start the story", "Once upon a time, a robot", max_chars=MAX_PROMPT_CHARS,

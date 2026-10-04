@@ -117,7 +117,7 @@
   <div class="bar">
     <button id="bPrevWord" title="Previous token (Shift+←)">⏮</button>
     <button id="bPrev" title="Step back (←)">◀</button>
-    <button id="bPlay" class="primary" title="Play / pause (Space)">❚❚ Pause</button>
+    <button id="bPlay" class="primary" title="Play / pause (Space)">▶ Play</button>
     <button id="bNext" title="Step forward (→)">▶</button>
     <button id="bNextWord" title="Next token (Shift+→)">⏭</button>
     <span class="sep"></span>
@@ -178,7 +178,7 @@ S.forEach((s, i) => {
   for (let l = 0; l < C.layers; l++) for (const st of LAYER_STAGES) frames.push({ i, stage: st, l });
   for (const st of ["final_norm", "logits", "sample"]) frames.push({ i, stage: st, l: null });
 });
-let cur = firstFrame[S.findIndex(s => s.pos === D.start)] ?? 0, playing = true, timer = null;
+let cur = firstFrame[S.findIndex(s => s.pos === D.start)] ?? 0, playing = false, timer = null;  // waits for Play
 
 // ---- Static parts: head picker, pipeline, cells, code
 const headSel = $("head");

@@ -1,6 +1,7 @@
 """Checks the numpy port of llama2.c against run.c itself. Run: python tests/test_llama.py
 
-Needs stories15M.bin and tokenizer.bin in LLAMA2C_DIR (default ~/Projects/llama2.c); skips otherwise.
+Needs stories15M.bin and tokenizer.bin in LLAMA2C_DIR (default ~/Projects/llama2.c) or the download cache;
+skips otherwise.
 The expected stories were printed by run.c with the same settings, e.g.
     ./run stories15M.bin -t 1.0 -s 7 -n 80 -i "The little dragon"
 """
@@ -78,8 +79,8 @@ def test_page_payload():
 
 
 if __name__ == "__main__":
-    if not llama.files_present():
-        print(f"skipped: no {llama.CHECKPOINT} / {llama.TOKENIZER} in {llama.LLAMA2C_DIR}")
+    if llama.model_dir() is None:
+        print(f"skipped: no {llama.CHECKPOINT} / {llama.TOKENIZER} in {llama.LLAMA2C_DIR} or {llama.DOWNLOAD_DIR}")
         sys.exit(0)
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for t in tests:
