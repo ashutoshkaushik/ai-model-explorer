@@ -40,6 +40,7 @@ python tests/test_growth.py   # growth-rate fit
 python tests/test_llm.py      # query functions + tool-use loop (fake client, no API calls)
 python tests/test_surprise.py # the 25 static facts
 python tests/test_insights.py # model profiles, compare, race frames, downloader change log
+python tests/test_llama.py    # numpy llama2.c port vs ./run output (skips without the model files)
 ```
 
 ## Conventions
@@ -58,3 +59,4 @@ python tests/test_insights.py # model profiles, compare, race frames, downloader
 - Chart colors: use `palette()` / `color_map` / `chart_tokens()` in `utils/charts.py` (they follow the light/dark mode) (fixed order, validated palette). Assign domain colors from the unfiltered data so filters never repaint a series; fold beyond 7 series into gray "Other".
 - Every page/chart area credits: **"Data: Epoch AI (CC-BY 4.0)"**.
 - Dependencies are pinned in `requirements.txt`.
+- "Inside a forward pass" (`lab/forward_pass.py` + `lab/forward_pass.html`) runs Karpathy's stories15M through `utils/llama.py`, a numpy port of llama2.c's `run.c` (same xorshift sampler, so seeds match `./run -s`). It reads `stories15M.bin`, `tokenizer.bin` and `run.c` from `LLAMA2C_DIR` (default `~/Projects/llama2.c`); the 60 MB model is never committed. The trace is sent to the iframe as JSON and animated in the browser; stage → run.c line ranges are found from run.c's comments at render time.

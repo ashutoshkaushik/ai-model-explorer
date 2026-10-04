@@ -12,6 +12,7 @@ import streamlit as st
 from lab.app_pages import ask_page, explorer_page
 from lab.architecture import eli5_page
 from lab.explore_pages import compare_page, cost_page, model_page, race_page
+from lab.forward_pass import forward_page
 from lab.home import home_page
 from lab.lab_pages import LAB_PAGES
 from lab.nav import PAGES, TOUR
@@ -38,6 +39,8 @@ def main() -> None:
                                url_path="leaderboard"),
         "browse": st.Page(browse_page, title="Browse the data", icon=":material/table_view:", url_path="browse"),
         "eli5": st.Page(eli5_page, title="How it works (ELI5)", icon=":material/lightbulb:", url_path="how-it-works"),
+        "forward": st.Page(forward_page, title="Inside a forward pass", icon=":material/neurology:",
+                           url_path="forward-pass"),
         "about": st.Page(about_page, title="How it's built", icon=":material/account_tree:", url_path="about"),
         "surprise": st.Page(surprise_page, title="An AI fact you didn't know", icon=":material/auto_awesome:",
                             url_path="surprise"),
@@ -48,7 +51,7 @@ def main() -> None:
     page = st.navigation({
         "App": [pages["home"], pages["explorer"], pages["race"], pages["model"], pages["compare"], pages["ask"]],
         "Overview": [pages["timeline"], pages["leaderboard"], pages["cost"], pages["browse"], pages["eli5"],
-                     pages["about"]],
+                     pages["forward"], pages["about"]],
         "Explorer Lab · built step by step": [pages[k] for k in TOUR],
         "Surprise me": [pages["surprise"]],
     }, expanded=True)  # always show every page; no "View more" in the sidebar

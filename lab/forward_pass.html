@@ -1,0 +1,517 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<!-- The 'Inside a forward pass' animation (lab/forward_pass.py fills in the colour tokens, fonts and the trace JSON). -->
+<style>
+  :root { /*__VARS__*/ color-scheme: __SCHEME__;
+          --pos: var(--data); --neg: var(--error); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--surface); color: var(--ink); font: 14px/1.45 __FONT_BODY__; }
+  #app { padding: 4px 2px 8px; display: flex; flex-direction: column; gap: 10px; }
+  button, select { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line);
+                   border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+  button:hover, select:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); min-width: 84px;
+                   font-weight: 600; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .bar .sep { width: 10px; }
+  .bar label { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 5px; }
+  .status { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .status b { color: var(--ink); }
+
+  .tokens { display: flex; flex-wrap: wrap; gap: 4px 3px; max-height: 128px; overflow-y: auto; padding: 8px;
+            background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  .chip { position: relative; font: 13px __FONT_MONO__; padding: 3px 6px 3px; border-radius: 6px; white-space: pre;
+          border: 1px solid transparent; transition: background-color .25s, opacity .25s; }
+  .chip.past { background: var(--surface); }
+  .chip.future { opacity: .32; border-style: dashed; border-color: var(--line); }
+  .chip.hidden { display: none; }
+  .chip.gen { box-shadow: inset 0 -2px 0 var(--llm); }
+  .chip.current { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .chip.new { animation: pop .5s ease-out; }
+  .chip .w { position: absolute; left: 0; right: 0; top: -12px; text-align: center; font: 600 9.5px __FONT_BODY__;
+             color: var(--muted); }
+  .tokens.attn { padding-top: 16px; }
+  @keyframes pop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+  .pipe { display: flex; align-items: stretch; gap: 6px; overflow-x: auto; }
+  .box { flex: 0 0 auto; min-width: 56px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 8px;
+         background: var(--card); font-size: 12px; text-align: center; color: var(--muted); cursor: pointer;
+         transition: all .2s; }
+  .box b { display: block; color: var(--ink); font-size: 12.5px; }
+  .box.on { color: var(--ink); transform: translateY(-2px); box-shadow: 0 3px 10px rgba(0,0,0,.12); }
+  .box.vec.on { border-color: var(--data); background: var(--data-soft); }
+  .box.att.on { border-color: var(--llm); background: var(--llm-soft); }
+  .box.ffn.on { border-color: var(--code); background: var(--code-soft); }
+  .box.out.on { border-color: var(--success); background: var(--success-soft); }
+  .layer { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; padding: 4px 6px 6px; border-radius: 10px;
+           border: 1px dashed var(--line); }
+  .layer .lt { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--muted);
+               padding: 0 2px; }
+  .layer .lt b { color: var(--ink); }
+  .dots { display: flex; gap: 4px; }
+  .dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line); font-size: 9.5px; line-height: 14px;
+         text-align: center; cursor: pointer; color: var(--muted); background: var(--card); }
+  .dot.done { background: var(--muted); color: var(--card); border-color: var(--muted); }
+  .dot.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .layer .row { display: flex; gap: 4px; }
+  .arrow { align-self: center; color: var(--muted); flex: 0 0 auto; }
+
+  .grid3 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1.2fr); gap: 10px; }
+  @media (max-width: 760px) { .grid3 { grid-template-columns: 1fr; } }  /* phones: the frame scrolls */
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+           height: 430px; overflow: hidden; display: flex; flex-direction: column; }
+  .panel h4 { margin: 0 0 4px; font: 600 15px __FONT_HEADING__; }
+  .panel .sub { font-size: 12.5px; color: var(--muted); margin: 0 0 8px; }
+  .cells { display: grid; gap: 1px; margin: 4px 0 8px; }
+  .cell { aspect-ratio: 1; border-radius: 2px; transition: background-color .3s; }
+  .scale { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .scale i { flex: 1; height: 8px; border-radius: 4px;
+             background: linear-gradient(90deg, var(--neg), var(--card) 50%, var(--pos)); border: 1px solid var(--line); }
+  .meter { margin: 8px 0 2px; font-size: 12px; color: var(--muted); }
+  .meter .track { height: 8px; border-radius: 4px; background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
+  .meter .fill { height: 100%; background: var(--data); transition: width .35s; }
+
+  #stage p.desc { margin: 0 0 10px; font-size: 13.5px; }
+  .viz { flex: 1; min-height: 0; overflow: auto; }
+  .heat { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
+  .heat td { min-width: 20px; height: 22px; border-radius: 3px; text-align: center; color: var(--ink); }
+  .heat th { font: 11px __FONT_MONO__; color: var(--muted); font-weight: 400; white-space: pre; padding: 0 3px; }
+  .heat th.col { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; height: 64px; }
+  .heat tr.sel th { color: var(--accent); font-weight: 600; }
+  .heat tr.sel td { outline: 1.5px solid var(--accent); }
+  .bars { display: flex; flex-direction: column; gap: 4px; }
+  .barrow { display: grid; grid-template-columns: 96px 1fr 48px; align-items: center; gap: 6px; font-size: 12px; }
+  .barrow .lab { font: 12.5px __FONT_MONO__; white-space: pre; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .barrow .tr { height: 16px; background: var(--surface); border-radius: 4px; overflow: hidden; }
+  .barrow .f { height: 100%; background: var(--data); border-radius: 4px; transition: width .4s; }
+  .barrow.pick .f { background: var(--llm); }
+  .barrow.pick .lab { font-weight: 700; }
+  .barrow .pct { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .kv { width: 100%; border-collapse: collapse; font: 12px __FONT_MONO__; }
+  .kv td { border-bottom: 1px solid var(--line); padding: 2px 6px; white-space: pre; }
+  .kv tr.now td { background: var(--llm-soft); font-weight: 600; }
+  .kv .k { color: var(--data); } .kv .v { color: var(--code); }
+  .big { font: 600 26px __FONT_MONO__; padding: 6px 12px; border-radius: 8px; background: var(--data-soft);
+         display: inline-block; margin: 6px 0; white-space: pre; }
+  .note { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .callout { border-left: 3px solid var(--llm); padding: 6px 10px; background: var(--surface); border-radius: 6px;
+             font-size: 13px; margin-top: 8px; }
+
+  #src { margin: 0; flex: 1; overflow: auto; font: 11.5px/1.5 __FONT_MONO__; background: var(--surface);
+         border-radius: 6px; padding: 4px 0; }
+  #src div { padding: 0 8px 0 0; white-space: pre; color: var(--muted); }
+  #src div span.n { display: inline-block; width: 34px; text-align: right; padding-right: 8px; opacity: .6; }
+  #src div.hl { background: var(--code-soft); color: var(--ink); box-shadow: inset 3px 0 0 var(--code); }
+
+  .scrub { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
+  .scrub input { flex: 1; accent-color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="bar">
+    <button id="bPrevWord" title="Previous token (Shift+←)">⏮</button>
+    <button id="bPrev" title="Step back (←)">◀</button>
+    <button id="bPlay" class="primary" title="Play / pause (Space)">❚❚ Pause</button>
+    <button id="bNext" title="Step forward (→)">▶</button>
+    <button id="bNextWord" title="Next token (Shift+→)">⏭</button>
+    <span class="sep"></span>
+    <label>Speed <select id="speed"><option>0.5</option><option>1</option><option selected>2</option><option>4</option><option>8</option></select>×</label>
+    <label>Attention <select id="head"></select></label>
+    <span class="status" id="status"></span>
+  </div>
+  <div class="tokens" id="tokens" aria-label="The tokens so far"></div>
+  <div class="pipe" id="pipe"></div>
+  <div class="grid3">
+    <section class="panel" id="vec">
+      <h4>The vector x</h4>
+      <p class="sub" id="vecsub"></p>
+      <div class="cells" id="cells"></div>
+      <div class="scale"><span>−</span><i></i><span>+</span></div>
+      <div class="meter" id="meter"></div>
+    </section>
+    <section class="panel" id="stage">
+      <h4 id="stitle"></h4>
+      <p class="desc" id="sdesc"></p>
+      <div class="viz" id="viz"></div>
+    </section>
+    <section class="panel">
+      <h4>run.c · forward()</h4>
+      <p class="sub" id="codesub">The line running now is highlighted.</p>
+      <div id="src"></div>
+    </section>
+  </div>
+  <div class="scrub"><span>Token</span><input type="range" id="scrub" min="0" step="1"><span id="scrubv"></span></div>
+</div>
+<script>
+const D = __DATA__;
+const C = D.config, S = D.steps;
+const LAYER_STAGES = ["attn_norm", "qkv", "rope", "attention", "attn_out", "ffn_norm", "swiglu", "ffn_residual"];
+const NAMES = { embed: "Embed", attn_norm: "RMSNorm", qkv: "Q · K · V", rope: "RoPE", attention: "Attention",
+  attn_out: "+ Residual", ffn_norm: "RMSNorm", swiglu: "SwiGLU", ffn_residual: "+ Residual",
+  final_norm: "Final norm", logits: "Logits", sample: "Sample" };
+const KIND = { embed: "vec", attn_norm: "att", qkv: "att", rope: "att", attention: "att", attn_out: "att",
+  ffn_norm: "ffn", swiglu: "ffn", ffn_residual: "ffn", final_norm: "out", logits: "out", sample: "out" };
+const BEAT = { embed: 900, attention: 1100, logits: 1300, sample: 1100, rope: 600, qkv: 500 };  // ms at 1×, default 380
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text; return e; };
+const label = id => D.labels[String(id)] ?? `#${id}`;
+const deq = v => v.q.map(n => n / 99 * v.s);
+const rms = a => Math.sqrt(a.reduce((s, x) => s + x * x, 0) / a.length);
+const norm = a => Math.sqrt(a.reduce((s, x) => s + x * x, 0));
+const pct = p => p >= 0.995 ? "99%+" : p < 0.001 ? "<0.1%" : (p * 100).toFixed(p < 0.1 ? 1 : 0) + "%";
+const fmt = x => x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2);
+const mix = (color, amount) => `color-mix(in srgb, ${color} ${Math.round(Math.min(1, amount) * 100)}%, var(--card))`;
+
+// Every frame of the animation: (step, stage, layer)
+const frames = [];
+const firstFrame = [];
+S.forEach((s, i) => {
+  firstFrame.push(frames.length);
+  frames.push({ i, stage: "embed", l: null });
+  for (let l = 0; l < C.layers; l++) for (const st of LAYER_STAGES) frames.push({ i, stage: st, l });
+  for (const st of ["final_norm", "logits", "sample"]) frames.push({ i, stage: st, l: null });
+});
+let cur = firstFrame[S.findIndex(s => s.pos === D.start)] ?? 0, playing = true, timer = null;
+
+// ---- Static parts: head picker, pipeline, cells, code
+const headSel = $("head");
+headSel.append(new Option("All heads (average)", "avg"));
+for (let h = 0; h < C.heads; h++) headSel.append(new Option(`Head ${h + 1}`, h));
+
+const pipe = $("pipe");
+const boxes = {};
+function box(stage, parent) {
+  const b = el("div", `box ${KIND[stage]}`);
+  b.append(el("b", null, NAMES[stage]));
+  b.onclick = () => { const f = frames[cur]; jump(frames.findIndex(x => x.i === f.i && x.stage === stage &&
+    (x.l === null || x.l === (f.l ?? 0)))); };
+  parent.append(b); boxes[stage] = b; return b;
+}
+box("embed", pipe); pipe.append(el("span", "arrow", "→"));
+const layerBox = el("div", "layer");
+const lt = el("div", "lt"); const ltName = el("span"); const dots = el("div", "dots");
+lt.append(ltName, dots); layerBox.append(lt);
+const row = el("div", "row"); layerBox.append(row);
+LAYER_STAGES.forEach(st => box(st, row));
+for (let l = 0; l < C.layers; l++) {
+  const d = el("div", "dot", String(l + 1)); d.title = `Jump to layer ${l + 1}`;
+  d.onclick = () => { const f = frames[cur]; jump(frames.findIndex(x => x.i === f.i && x.l === l && x.stage === "attention")); };
+  dots.append(d);
+}
+pipe.append(layerBox, el("span", "arrow", "→"));
+["final_norm", "logits", "sample"].forEach((st, k) => { if (k) pipe.append(el("span", "arrow", "→")); box(st, pipe); });
+
+const COLS = 24;
+const cells = $("cells");
+cells.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+const cellEls = Array.from({ length: C.dim }, () => { const c = el("div", "cell"); cells.append(c); return c; });
+
+const src = $("src"), lineEls = {};
+if (D.code) {
+  D.code.lines.forEach((text, k) => {
+    const n = D.code.first + k, d = el("div");
+    d.append(el("span", "n", String(n)), document.createTextNode(text));
+    src.append(d); lineEls[n] = d;
+  });
+} else {
+  src.append(el("div", null, "  run.c wasn't found next to the model, so the code can't be shown."));
+}
+
+// ---- What x looks like at each frame
+function xAt(f) {
+  const s = S[f.i];
+  if (f.stage === "embed") return { x: deq(s.embed), what: "the token's embedding row" };
+  if (f.l === null) return { x: deq(s.final), what: "after the final RMSNorm" };
+  const L = s.layers[f.l], before = f.l === 0 ? s.embed : s.layers[f.l - 1].afterFfn;
+  if (["attn_norm", "qkv", "rope", "attention"].includes(f.stage))
+    return { x: deq(before), normed: f.stage !== "attention", what: f.stage === "attention" ? "unchanged while attention reads it" : "rescaled by RMSNorm (copy fed to q, k, v)" };
+  if (f.stage === "attn_out") return { x: deq(L.afterAttn), what: `after adding layer ${f.l + 1}'s attention` };
+  if (f.stage === "ffn_norm" || f.stage === "swiglu") return { x: deq(L.afterAttn), normed: f.stage === "ffn_norm", what: f.stage === "ffn_norm" ? "rescaled by RMSNorm (copy fed to the feed-forward)" : "unchanged while the feed-forward works" };
+  return { x: deq(L.afterFfn), what: `after adding layer ${f.l + 1}'s feed-forward` };
+}
+
+function attWeights(s, l) {
+  const att = s.layers[l].att, h = headSel.value;
+  if (h !== "avg") return att[+h];
+  return att[0].map((_, t) => att.reduce((sum, a) => sum + a[t], 0) / att.length);
+}
+
+// ---- Render one frame
+function render() {
+  const f = frames[cur], s = S[f.i], tok = s.token;
+  const inAttn = f.l !== null && (f.stage === "attention" || f.stage === "attn_out");
+  const revealed = f.stage === "sample";
+
+  // tokens
+  const tokens = $("tokens"); tokens.textContent = ""; tokens.classList.toggle("attn", inAttn);
+  const w = inAttn ? attWeights(s, f.l) : null;
+  S.forEach((st, k) => {
+    const c = el("span", "chip", label(st.token));
+    const generated = k > 0 && !S[k - 1].forced;
+    if (generated) c.classList.add("gen");
+    if (k < f.i) c.classList.add("past");
+    if (k === f.i) c.classList.add("current");
+    if (k > f.i) c.classList.add(generated ? "hidden" : "future");
+    if (w && k <= f.i) {
+      c.style.background = mix("var(--llm)", Math.sqrt(w[k]));
+      c.append(el("span", "w", pct(w[k])));
+      c.title = `${pct(w[k])} of this head's attention`;
+    }
+    tokens.append(c);
+  });
+  if (revealed) {  // the chosen token joins the text (if it isn't already shown as part of the prompt)
+    const next = tokens.children[f.i + 1];
+    if (next) { next.classList.remove("hidden", "future"); next.classList.add("new"); }
+    else if (s.next !== 1) { const c = el("span", "chip gen new", label(s.next)); tokens.append(c); }
+  }
+  if (f.stage === "embed" || revealed) tokens.children[f.i]?.scrollIntoView({ block: "nearest" });
+
+  // pipeline
+  for (const [st, b] of Object.entries(boxes)) b.classList.toggle("on", st === f.stage);
+  ltName.innerHTML = "";
+  ltName.append(document.createTextNode("Layer "), el("b", null, f.l === null ? (f.stage === "embed" ? "–" : "done") : `${f.l + 1} of ${C.layers}`));
+  [...dots.children].forEach((d, l) => {
+    d.className = "dot" + (f.l === l ? " on" : (f.l === null ? f.stage !== "embed" : l < f.l) ? " done" : "");
+  });
+
+  // the vector x
+  const v = xAt(f);
+  let shown = v.x;
+  if (v.normed) { const r = rms(v.x); shown = v.x.map(x => x / r); }
+  const scale = 2.5 * rms(shown);
+  shown.forEach((x, k) => {
+    cellEls[k].style.background = mix(x >= 0 ? "var(--pos)" : "var(--neg)", Math.abs(x) / scale);
+  });
+  $("vecsub").textContent = `All ${C.dim} numbers, ${v.what}.`;
+  const lastLayer = deq(s.layers[C.layers - 1].afterFfn), maxN = norm(lastLayer) * 1.05;
+  const n = norm(v.normed ? shown : v.x);
+  $("meter").innerHTML = "";
+  $("meter").append(el("div", null, `Length of x: ${fmt(n)}${v.normed ? " (rescaled)" : ""}`));
+  const tr = el("div", "track"), fill = el("div", "fill"); fill.style.width = `${Math.min(100, n / maxN * 100)}%`;
+  tr.append(fill); $("meter").append(tr);
+
+  // the stage card
+  stage(f, s, w);
+
+  // code
+  Object.values(lineEls).forEach(d => d.classList.remove("hl"));
+  const span = D.code?.spans[f.stage];
+  if (span) {
+    for (let n = span[0]; n <= span[1]; n++) lineEls[n]?.classList.add("hl");
+    const top = lineEls[span[0]];
+    if (top) src.scrollTo({ top: top.offsetTop - src.offsetTop - 30, behavior: "smooth" });
+  }
+
+  // status and scrubber
+  const status = $("status"); status.innerHTML = "";
+  status.append(document.createTextNode("Token "), el("b", null, `${f.i + 1} of ${S.length}`),
+    document.createTextNode(` · position ${s.pos} · `), el("b", null, f.l === null ? NAMES[f.stage] : `layer ${f.l + 1}: ${NAMES[f.stage]}`));
+  $("scrub").max = S.length - 1; $("scrub").value = f.i;
+  $("scrubv").textContent = `${f.i + 1} / ${S.length}`;
+  $("bPlay").textContent = playing ? "❚❚ Pause" : (cur === frames.length - 1 ? "↻ Replay" : "▶ Play");
+}
+
+function stage(f, s, w) {
+  const viz = $("viz"); viz.textContent = "";
+  const T = (t, d) => { $("stitle").textContent = t; $("sdesc").textContent = d; };
+  const word = label(s.token), L = f.l === null ? null : f.l + 1;
+  switch (f.stage) {
+    case "embed": {
+      T("1 · A token becomes numbers", `The input token “${word}” (id ${s.token}) picks row ${s.token} of the ` +
+        `${C.vocab.toLocaleString()} × ${C.dim} embedding table. That row of ${C.dim} learned numbers is x, ` +
+        `the vector that flows through every layer.`);
+      viz.append(el("div", "big", word));
+      viz.append(el("div", "note", s.pos === 0 ? "<s> marks the start of the text. Every story begins with it." :
+        s.forced ? "This token is part of your prompt, so the model reads it rather than choosing it." :
+                   "The model wrote this token itself in the previous step."));
+      break;
+    }
+    case "attn_norm": case "ffn_norm": {
+      T(`RMSNorm · layer ${L}`, `Divide x by its root-mean-square so its typical size is 1, then multiply by ` +
+        `${C.dim} learned weights. It keeps the numbers in a steady range however deep the network is.`);
+      const raw = xAt({ ...f, stage: f.stage === "attn_norm" ? "attention" : "swiglu" }).x;
+      viz.append(el("div", "callout", `RMS before: ${fmt(rms(raw))} → after: 1.00`));
+      viz.append(el("div", "note", f.stage === "attn_norm" ? "Next, this rescaled copy is turned into queries, keys and values." :
+        "Next, this rescaled copy goes into the feed-forward block."));
+      break;
+    }
+    case "qkv": {
+      T(`Query, key, value · layer ${L}`, `Three ${C.dim} × ${C.dim} matrix multiplications turn x into q ` +
+        `(“what am I looking for?”), k (“what do I contain?”) and v (“what do I pass on?”). k and v are saved in ` +
+        `the KV cache, so earlier tokens never have to be recomputed.`);
+      const t = el("table", "kv");
+      const show = Math.min(s.pos + 1, 12), from = s.pos + 1 - show;
+      if (from > 0) { const r = t.insertRow(); r.insertCell().textContent = `… ${from} earlier rows`; }
+      for (let p = from; p <= s.pos; p++) {
+        const r = t.insertRow(); if (p === s.pos) r.className = "now";
+        r.insertCell().textContent = String(p);
+        r.insertCell().textContent = label(S[p].token);
+        const k = r.insertCell(); k.className = "k"; k.textContent = "k ✓";
+        const v = r.insertCell(); v.className = "v"; v.textContent = p === s.pos ? "v ✓ written now" : "v ✓";
+      }
+      viz.append(el("div", "note", `KV cache for layer ${L}: ${s.pos + 1} row${s.pos ? "s" : ""}`), t);
+      break;
+    }
+    case "rope": {
+      T(`RoPE: stamp the position · layer ${L}`, `q and k are split into pairs, and each pair is rotated by ` +
+        `position × its own frequency (position ${s.pos} here). Fast pairs spin, slow pairs barely move, so ` +
+        `q · k ends up depending on how far apart two tokens are.`);
+      viz.append(dials(s.pos));
+      break;
+    }
+    case "attention": {
+      const att = s.layers[f.l].att;
+      T(`Attention: look back · layer ${L}`, `Each of the ${C.heads} heads scores every token so far ` +
+        `(q · k ÷ √${C.headSize}), softmax turns the scores into weights that add up to 100%, and the head takes ` +
+        `the weighted mix of their v vectors. Tokens after this one are out of reach.`);
+      const tb = el("table", "heat"), head = tb.insertRow(); head.append(el("th"));
+      const cols = s.pos + 1, from = Math.max(0, cols - 18);
+      for (let t = from; t < cols; t++) head.append(el("th", "col", label(S[t].token)));
+      att.forEach((a, h) => {
+        const r = tb.insertRow(); if (headSel.value === String(h)) r.className = "sel";
+        const th = el("th", null, `head ${h + 1}`); r.append(th);
+        for (let t = from; t < cols; t++) {
+          const td = r.insertCell(); td.style.background = mix("var(--llm)", Math.sqrt(a[t]));
+          td.title = `head ${h + 1} → “${label(S[t].token)}”: ${pct(a[t])}`;
+          if (a[t] >= 0.3) td.textContent = Math.round(a[t] * 100);
+        }
+      });
+      viz.append(tb);
+      const best = w.indexOf(Math.max(...w));
+      const who = headSel.value === "avg" ? "On average the heads look" : `Head ${+headSel.value + 1} looks`;
+      viz.append(el("div", "callout", `${who} most at “${label(S[best].token)}” (${pct(w[best])}).` +
+        (from ? ` Showing the last 18 of ${cols} tokens.` : "")));
+      break;
+    }
+    case "attn_out": case "ffn_residual": {
+      const lay = s.layers[f.l], isA = f.stage === "attn_out";
+      T(isA ? `Mix the heads, add to x · layer ${L}` : `Add to x again · layer ${L}`,
+        isA ? `The matrix wo blends the ${C.heads} heads' outputs into one ${C.dim}-number update, which is added ` +
+              `to x (a residual connection). Adding instead of replacing lets every layer keep what came before.`
+            : `The feed-forward's ${C.dim}-number output is added to x, the same residual trick. x now leaves ` +
+              `layer ${L}${L < C.layers ? ` for layer ${L + 1}` : " for the final norm"}.`);
+      const before = isA ? (f.l === 0 ? s.embed : s.layers[f.l - 1].afterFfn) : lay.afterAttn;
+      const nb = norm(deq(before)), d = isA ? lay.attnNorm : lay.ffnNorm, m = Math.max(nb, d) * 1.1;
+      const bars = el("div", "bars");
+      bars.append(barRow("x before", nb / m, fmt(nb)), barRow(isA ? "+ attention" : "+ feed-fwd", d / m, fmt(d), true));
+      viz.append(el("div", "note", "Length of each vector:"), bars);
+      break;
+    }
+    case "swiglu": {
+      const hid = deq(s.layers[f.l].hidden);
+      T(`SwiGLU feed-forward · layer ${L}`, `x is widened to ${C.hidden} numbers twice (w1 and w3). ` +
+        `SiLU of the first acts as a gate on the second: near-zero gates block, large ones let the value through. ` +
+        `w2 folds the ${C.hidden} results back to ${C.dim}.`);
+      const g = el("div", "cells"); g.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+      const sc = 2.5 * rms(hid);
+      hid.forEach(x => { const c = el("div", "cell"); c.style.background = mix(x >= 0 ? "var(--pos)" : "var(--neg)", Math.abs(x) / sc); g.append(c); });
+      const open = hid.filter(x => Math.abs(x) > 0.25 * Math.max(...hid.map(Math.abs))).length;
+      viz.append(el("div", "note", `The first ${C.hiddenShown} of ${C.hidden} gated values:`), g,
+        el("div", "callout", `${open} of these ${C.hiddenShown} are strongly “on”; most stay near zero. Each layer ` +
+          `switches on a different handful for each token.`));
+      break;
+    }
+    case "final_norm": {
+      T("Final RMSNorm", `After all ${C.layers} layers, x is rescaled one last time. It now encodes everything ` +
+        `the model has worked out about what should come after “${word}”.`);
+      viz.append(el("div", "callout", `${C.layers} layers × (attention + feed-forward) = ${C.layers * 2} updates were added to the embedding.`));
+      break;
+    }
+    case "logits": case "sample": {
+      const picked = f.stage === "sample";
+      const T0 = D.temperature;
+      if (!picked) {
+        T("Score every token", `x is compared (a dot product) with all ${C.vocab.toLocaleString()} token ` +
+          `embeddings, giving one score, a logit, for each. Softmax${T0 > 0 ? ` at temperature ${T0}` : ""} turns ` +
+          `the scores into probabilities. The ten most likely:`);
+      } else if (s.forced) {
+        T("Next: your prompt's next token", `This position is still inside your prompt, so the next token is ` +
+          `the prompt's “${label(s.next)}” whatever the model predicted. Its guess is still worth a look.`);
+      } else if (s.next === 1) {
+        T("The story ends", "The model chose the start-of-text token, which ends the story, just like run.c.");
+      } else {
+        T("Pick the next token", T0 === 0 ? `Temperature 0: take the most likely token, “${label(s.next)}”.` :
+          `A random draw among the likeliest tokens (top-p 0.9) picked “${label(s.next)}”, which had a ` +
+          `${pct(s.nextProb)} chance. It's appended and fed back in as the next input.`);
+      }
+      const bars = el("div", "bars"), maxP = s.top[0][1];
+      s.top.forEach(([lab, p]) => bars.append(barRow(lab, p / maxP, pct(p), picked && lab === label(s.next))));
+      viz.append(bars);
+      if (picked && !s.top.some(([lab]) => lab === label(s.next)))
+        viz.append(el("div", "callout", `“${label(s.next)}” (${pct(s.nextProb)}) wasn't in the top ten.`));
+      break;
+    }
+  }
+}
+
+function barRow(lab, frac, txt, pick) {
+  const r = el("div", "barrow" + (pick ? " pick" : ""));
+  const tr = el("div", "tr"), f = el("div", "f"); f.style.width = `${Math.max(1, frac * 100)}%`; tr.append(f);
+  r.append(el("span", "lab", lab), tr, el("span", "pct", txt));
+  return r;
+}
+
+function dials(pos) {
+  const NS = "http://www.w3.org/2000/svg", pairs = [0, 4, 12, C.headSize / 2 - 1];
+  const svg = document.createElementNS(NS, "svg"); svg.setAttribute("viewBox", "0 0 360 130"); svg.style.width = "100%";
+  pairs.forEach((p, k) => {
+    const freq = Math.pow(10000, -(2 * p) / C.headSize), ang = pos * freq, cx = 45 + k * 90, cy = 52, r = 34;
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const a in attrs) e.setAttribute(a, attrs[a]); svg.append(e); return e; };
+    mk("circle", { cx, cy, r, fill: "none", stroke: "var(--line)", "stroke-width": 2 });
+    mk("line", { x1: cx, y1: cy, x2: cx + r, y2: cy, stroke: "var(--muted)", "stroke-dasharray": "3 3" });
+    mk("line", { x1: cx, y1: cy, x2: cx + r * Math.cos(-ang), y2: cy + r * Math.sin(-ang), stroke: "var(--llm)", "stroke-width": 3, "stroke-linecap": "round" });
+    const t = mk("text", { x: cx, y: 104, "text-anchor": "middle", fill: "var(--ink)", "font-size": 11 }); t.textContent = `pair ${p + 1}`;
+    const t2 = mk("text", { x: cx, y: 119, "text-anchor": "middle", fill: "var(--muted)", "font-size": 10 });
+    t2.textContent = `${((ang * 180 / Math.PI) % 360).toFixed(ang < 0.1 ? 2 : 0)}°`;
+  });
+  const wrap = el("div"); wrap.append(svg,
+    el("div", "note", `Each dial is one pair of numbers inside a ${C.headSize}-number head, turned by position × ` +
+      `10000^(−2i/${C.headSize}). Pair 1 turns 1 radian per position; pair ${C.headSize / 2} turns about ` +
+      `${(Math.pow(10000, -(C.headSize - 2) / C.headSize)).toExponential(0)} radians.`));
+  return wrap;
+}
+
+// ---- Playback
+function schedule() {
+  clearTimeout(timer);
+  if (!playing) return;
+  const f = frames[cur], ms = (BEAT[f.stage] ?? 380) / +$("speed").value;
+  timer = setTimeout(() => {
+    if (cur < frames.length - 1) { cur++; render(); schedule(); }
+    else { playing = false; render(); }
+  }, ms);
+}
+function jump(k) { if (k < 0 || k >= frames.length) return; cur = k; render(); schedule(); }
+function pause() { playing = false; clearTimeout(timer); render(); }
+$("bPlay").onclick = () => {
+  if (playing) return pause();
+  if (cur === frames.length - 1) cur = 0;
+  playing = true; render(); schedule();
+};
+$("bNext").onclick = () => { pause(); jump(cur + 1); };
+$("bPrev").onclick = () => { pause(); jump(cur - 1); };
+$("bNextWord").onclick = () => jump(firstFrame[Math.min(S.length - 1, frames[cur].i + 1)]);
+$("bPrevWord").onclick = () => {
+  const i = frames[cur].i; jump(firstFrame[cur === firstFrame[i] ? Math.max(0, i - 1) : i]);
+};
+$("scrub").oninput = e => jump(firstFrame[+e.target.value]);
+$("speed").onchange = schedule;
+headSel.onchange = render;
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+  if (e.key === " ") { e.preventDefault(); $("bPlay").click(); }
+  else if (e.key === "ArrowRight") (e.shiftKey ? $("bNextWord") : $("bNext")).click();
+  else if (e.key === "ArrowLeft") (e.shiftKey ? $("bPrevWord") : $("bPrev")).click();
+});
+
+render(); schedule();
+</script>
+</body>
+</html>

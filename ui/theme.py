@@ -101,6 +101,9 @@ def apply_theme() -> None:
   .callout {{ border-left: 3px solid var(--accent); background: var(--card); border-radius: 6px;
               padding: .6rem .9rem; margin: .4rem 0 .8rem; }}
   .credit {{ font-size: .78rem; color: var(--muted); margin-top: .2rem; }}
+  .fp-story {{ font-family: var(--font-heading); font-size: 1.12rem; line-height: 1.7; background: var(--card);
+               border: 1px solid var(--line); border-radius: .6rem; padding: .8rem 1rem; }}
+  .fp-story .gen {{ background: var(--llm-soft); color: var(--ink); border-radius: 3px; }}
 
   /* ---- Site chrome (ui/chrome.py) */
   .author-name {{ font-family: var(--font-heading); font-size: 1.05rem; font-weight: 600; margin-bottom: .45rem;
