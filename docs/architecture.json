@@ -1,0 +1,463 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Model Evolution Explorer: runtime architecture",
+    "output": "docs/architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ashutoshkaushik/ai-model-explorer.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "d5cba9a0f4ed5ec8e7603c9525db7bd3886d933a"
+    }
+  },
+  "components": [
+    {
+      "id": "visitor",
+      "type": "external",
+      "label": "Visitor",
+      "sublabel": "browser",
+      "pos": [
+        40,
+        260
+      ],
+      "size": [
+        120,
+        64
+      ]
+    },
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "Streamlit app",
+      "sublabel": "app.py · st.navigation",
+      "pos": [
+        240,
+        260
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "app.py",
+          "line": 24,
+          "end_line": 60,
+          "label": "page registry + chrome"
+        }
+      ]
+    },
+    {
+      "id": "pages",
+      "type": "frontend",
+      "label": "Page modules",
+      "sublabel": "lab/*.py · 4 nav groups",
+      "pos": [
+        480,
+        260
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "app.py",
+          "line": 51,
+          "end_line": 58,
+          "label": "navigation groups"
+        },
+        {
+          "path": "lab/app_pages.py",
+          "line": 90,
+          "end_line": 120,
+          "label": "Ask the Data page"
+        }
+      ]
+    },
+    {
+      "id": "filters",
+      "type": "frontend",
+      "label": "Sidebar filters",
+      "sublabel": "ui/filters.py",
+      "pos": [
+        750,
+        260
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ui/filters.py",
+          "line": 76,
+          "end_line": 105,
+          "label": "sidebar_filters()"
+        }
+      ]
+    },
+    {
+      "id": "loader",
+      "type": "backend",
+      "label": "Data loader",
+      "sublabel": "utils/data_loader.py",
+      "pos": [
+        990,
+        260
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "st.cache_data",
+      "sources": [
+        {
+          "path": "utils/data_loader.py",
+          "line": 55,
+          "end_line": 70,
+          "label": "load_data()"
+        },
+        {
+          "path": "utils/data_loader.py",
+          "line": 77,
+          "end_line": 99,
+          "label": "apply_filters()"
+        }
+      ]
+    },
+    {
+      "id": "snapshot",
+      "type": "database",
+      "label": "Dataset snapshot",
+      "sublabel": "data/*.csv · changes.json",
+      "pos": [
+        990,
+        580
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "utils/data_loader.py",
+          "line": 57,
+          "end_line": 59,
+          "label": "read_csv + text repair"
+        },
+        {
+          "path": "utils/data_loader.py",
+          "line": 102,
+          "end_line": 105,
+          "label": "milestones.csv"
+        }
+      ]
+    },
+    {
+      "id": "refresh",
+      "type": "backend",
+      "label": "download_data.py",
+      "sublabel": "offline refresh CLI",
+      "pos": [
+        990,
+        740
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "scripts/download_data.py",
+          "line": 68,
+          "end_line": 98,
+          "label": "fetch, validate, write"
+        }
+      ]
+    },
+    {
+      "id": "epoch",
+      "type": "external",
+      "label": "Epoch AI",
+      "sublabel": "notable_ai_models.csv",
+      "pos": [
+        750,
+        740
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "CC-BY 4.0",
+      "sources": [
+        {
+          "path": "scripts/download_data.py",
+          "line": 19,
+          "end_line": 25,
+          "label": "source + mirror URLs"
+        }
+      ]
+    },
+    {
+      "id": "charts",
+      "type": "backend",
+      "label": "Charts + insights",
+      "sublabel": "utils/charts.py · insights.py",
+      "pos": [
+        470,
+        90
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "tag": "Plotly",
+      "sources": [
+        {
+          "path": "utils/charts.py",
+          "line": 173,
+          "end_line": 230,
+          "label": "over_time_scatter()"
+        },
+        {
+          "path": "utils/insights.py",
+          "line": 47,
+          "end_line": 108,
+          "label": "profiles, compare, race"
+        }
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "backend",
+      "label": "Ask the Data",
+      "sublabel": "utils/llm.py · 9 query tools",
+      "pos": [
+        470,
+        420
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "utils/llm.py",
+          "line": 164,
+          "end_line": 226,
+          "label": "QUERIES registry + run_query"
+        },
+        {
+          "path": "utils/llm.py",
+          "line": 287,
+          "end_line": 308,
+          "label": "tool-use loop"
+        }
+      ]
+    },
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Anthropic API",
+      "sublabel": "Claude Messages",
+      "pos": [
+        480,
+        580
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "ANTHROPIC_API_KEY",
+      "sources": [
+        {
+          "path": "utils/llm.py",
+          "line": 41,
+          "end_line": 50,
+          "label": "key from st.secrets / env"
+        },
+        {
+          "path": "utils/llm.py",
+          "line": 253,
+          "end_line": 274,
+          "label": "messages.create"
+        }
+      ]
+    },
+    {
+      "id": "llama",
+      "type": "backend",
+      "label": "Forward pass",
+      "sublabel": "utils/llama.py · numpy",
+      "pos": [
+        235,
+        420
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "lab/forward_pass.py",
+          "line": 42,
+          "end_line": 47,
+          "label": "load_model()"
+        },
+        {
+          "path": "utils/llama.py",
+          "line": 19,
+          "end_line": 28,
+          "label": "model locations"
+        }
+      ]
+    },
+    {
+      "id": "weights",
+      "type": "external",
+      "label": "stories15M weights",
+      "sublabel": "Hugging Face + llama2.c",
+      "pos": [
+        235,
+        580
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "utils/llama.py",
+          "line": 153,
+          "end_line": 170,
+          "label": "download() once"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Streamlit server process",
+      "wraps": [
+        "app",
+        "pages",
+        "filters",
+        "loader",
+        "charts",
+        "llm",
+        "llama"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "visit",
+      "from": "visitor",
+      "to": "app",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "route",
+      "from": "app",
+      "to": "pages",
+      "label": "run page",
+      "variant": "emphasis"
+    },
+    {
+      "id": "draw-filters",
+      "from": "pages",
+      "to": "filters",
+      "label": "draw filters",
+      "variant": "emphasis"
+    },
+    {
+      "id": "load-filter",
+      "from": "filters",
+      "to": "loader",
+      "label": "load data",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read-snapshot",
+      "from": "loader",
+      "to": "snapshot",
+      "label": "pd.read_csv"
+    },
+    {
+      "id": "write-snapshot",
+      "from": "refresh",
+      "to": "snapshot",
+      "label": "write CSV"
+    },
+    {
+      "id": "fetch-epoch",
+      "from": "refresh",
+      "to": "epoch",
+      "label": "GET CSV",
+      "variant": "dashed"
+    },
+    {
+      "id": "draw-charts",
+      "from": "pages",
+      "to": "charts",
+      "label": "df to figure"
+    },
+    {
+      "id": "ask-data",
+      "from": "pages",
+      "to": "llm",
+      "label": "question + df"
+    },
+    {
+      "id": "tool-use",
+      "from": "llm",
+      "to": "claude",
+      "label": "tool use",
+      "variant": "dashed"
+    },
+    {
+      "id": "run-forward",
+      "from": "pages",
+      "to": "llama",
+      "label": "trace"
+    },
+    {
+      "id": "fetch-weights",
+      "from": "llama",
+      "to": "weights",
+      "label": "download once",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Data",
+      "items": [
+        "Epoch AI Notable AI Models, 1,072 rows, cached once per process",
+        "Filters persist across pages in st.session_state"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Safe LLM use",
+      "items": [
+        "Claude only picks one of 9 registered query functions",
+        "run_query drops unknown arguments; no generated code runs"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Forward pass",
+      "items": [
+        "numpy port of llama2.c run.c; same sampler as ./run",
+        "60 MB model downloaded once, never committed"
+      ]
+    }
+  ]
+}
