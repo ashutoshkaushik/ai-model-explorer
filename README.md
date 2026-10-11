@@ -28,7 +28,7 @@ The sidebar groups the pages. Light and dark themes follow your system setting.
 - **The compute race:** an animated bar race of the ten largest training runs, year by year from 2012.
 - **Find a model:** a profile card for any model: its rank that year, percentile, distance from the trend line, and the most similar models. The URL updates, so you can share a link.
 - **Compare two models:** side by side, with a headline like "GPT-3 used 668,085× the training compute of AlexNet".
-- **Ask the Data:** plain-English questions answered by Claude through tool use. Claude picks one of 9 safe, predefined query functions and summarizes the result; it never writes or runs code.
+- **Ask the Data:** plain-English questions answered by OpenAI through tool use. The model picks one of 9 safe, predefined query functions and summarizes the result; it never writes or runs code.
 
 ### Overview
 - **Milestones timeline** and **Frontier leaderboard** (the running record holder, year by year).
@@ -63,7 +63,7 @@ flowchart LR
     subgraph utils["utils/ (logic)"]
         LOAD["data_loader.py<br/>@st.cache_data load + clean<br/>apply_filters, helpers"]
         CH["charts.py<br/>Plotly figures, growth fit<br/>light/dark aware"]
-        LLM["llm.py<br/>9 safe query functions<br/>Claude tool use"]
+        LLM["llm.py<br/>9 safe query functions<br/>OpenAI tool use"]
         INS["insights.py<br/>profiles, similar models,<br/>race frames, live growth"]
         LL["llama.py<br/>numpy port of llama2.c"]
     end
@@ -87,11 +87,11 @@ flowchart LR
     P2 --> LL
     P3 --> CH
     P1 -->|filtered df + question| LLM
-    LLM <-->|tools / summaries| API[Anthropic API]
+    LLM <-->|tools / summaries| API[OpenAI API]
     LL -->|first run only| HF[Hugging Face<br/>stories15M.bin]
 ```
 
-**Ask the Data:** the question and the active filters go to Claude with 9 tool definitions (`count_by_org`, `top_models_by_compute`, `domain_trend`, `growth_rate`, …). Claude replies with a `tool_use` block; the app checks the arguments against that tool's schema, runs the matching pandas function on the filtered data, and returns the table as a `tool_result`. Claude then answers in 2–3 sentences, and an expander shows exactly which functions ran.
+**Ask the Data:** the question and the active filters go to OpenAI (`gpt-4o-mini`) with 9 tool definitions (`count_by_org`, `top_models_by_compute`, `domain_trend`, `growth_rate`, …). The model requests a tool call; the app checks the arguments against that tool's schema, runs the matching pandas function on the filtered data, and returns the table. The model then answers in 2–3 sentences, and an expander shows exactly which functions ran.
 
 **Inside a forward pass:** `utils/llama.py` is a numpy port of Karpathy's `run.c`, with the same tokenizer and random number generator, so a seed here writes the same story as `./run -s`. It records every attention weight and the vector *x* after each step; the page sends that trace to the browser as JSON and animates it there.
 
@@ -102,7 +102,7 @@ flowchart LR
 | App | Streamlit (`st.navigation`, fragments, cached data) |
 | Charts | Plotly |
 | Data | pandas, Epoch AI's Notable AI Models CSV |
-| LLM | Claude via the Anthropic API (tool use) |
+| LLM | OpenAI `gpt-4o-mini` via the OpenAI API (tool use) |
 | Model demo | numpy port of llama2.c running stories15M |
 | Tests | plain Python test scripts, offline |
 
@@ -115,7 +115,7 @@ python3 -m venv .venv                # or: uv venv --python 3.12 .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python scripts/download_data.py      # skips if present; --force to refresh
-cp .streamlit/secrets.toml.example .streamlit/secrets.toml   # optional: set ANTHROPIC_API_KEY for Ask the Data
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml   # optional: set OPENAI_API_KEY for Ask the Data
 streamlit run app.py
 ```
 
@@ -134,7 +134,7 @@ python tests/test_llama.py      # numpy llama2.c port vs ./run output
 ## Deploy to Streamlit Community Cloud
 
 1. At [share.streamlit.io](https://share.streamlit.io), click **Create app**, pick this repo and set the main file to `app.py`.
-2. Optional: under *Advanced settings → Secrets*, add `ANTHROPIC_API_KEY = "sk-ant-..."` to turn on Ask the Data.
+2. Optional: under *Advanced settings → Secrets*, add `OPENAI_API_KEY = "sk-proj-..."` to turn on Ask the Data.
 3. Deploy. Every push to `main` redeploys the app.
 
 ## Project layout
@@ -152,7 +152,7 @@ python tests/test_llama.py      # numpy llama2.c port vs ./run output
 | `utils/data_loader.py` | Cached loading and cleaning, filters, leaderboard helpers |
 | `utils/charts.py` | Every Plotly chart and the growth fit |
 | `utils/insights.py` | Model profiles, comparisons, race frames, live growth, what's new |
-| `utils/llm.py` | Anthropic client, safe query functions, tool-use loop |
+| `utils/llm.py` | OpenAI client, safe query functions, tool-use loop |
 | `utils/llama.py` | numpy port of llama2.c (model, tokenizer, sampler, traced forward pass) |
 | `scripts/download_data.py` | Dataset download with fallback and validation |
 | `data/milestones.csv` | Curated AI milestones |

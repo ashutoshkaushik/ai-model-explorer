@@ -54,7 +54,7 @@ python tests/test_llama.py    # numpy llama2.c port vs ./run output (skips witho
 - The Start page's "Happening right now" counter ticks for `LIVE_SECONDS` (10) and then freezes, so it doesn't poll the server forever.
 - `scripts/download_data.py --force` writes `data/changes.json` (models added/removed); the Start page's What's new reads it.
 - Split comma-separated multi-value columns (`str.split(",")` + `explode`) before grouping by org/domain.
-- Never hardcode API keys. Read `ANTHROPIC_API_KEY` from `st.secrets` (`.streamlit/secrets.toml`, gitignored) or the environment; see `utils/llm.py`.
+- Never hardcode API keys. Read `OPENAI_API_KEY` from `st.secrets` (`.streamlit/secrets.toml`, gitignored) or the environment; see `utils/llm.py`.
 - Never execute LLM-generated code. Ask the Data only dispatches to the functions registered in `utils/llm.QUERIES`; add new capabilities there.
 - Every chart, table, and LLM call uses the sidebar-filtered `df`. Handle empty results with a friendly message.
 - Chart colors: use `palette()` / `color_map` / `chart_tokens()` in `utils/charts.py` (they follow the light/dark mode) (fixed order, validated palette). Assign domain colors from the unfiltered data so filters never repaint a series; fold beyond 7 series into gray "Other".

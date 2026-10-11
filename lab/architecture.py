@@ -1,7 +1,7 @@
 """'How it works (ELI5)': the whole app as one simple picture, then the journey of one question.
 
 The diagram is an SVG drawn with the site's colour tokens (ui/theme.py: data = blue, code = purple,
-Claude = amber, you = terracotta), so it matches light and dark mode. Streamlit strips inline <svg>,
+OpenAI = amber, you = terracotta), so it matches light and dark mode. Streamlit strips inline <svg>,
 so it is embedded as an <img> with a data URI, the same approach as the Travel Agent Lab's diagram.
 """
 
@@ -57,19 +57,19 @@ def diagram_svg(n_models: int) -> str:
         f"<text x='{x1}' y='34' class='band'>THE DATA</text>",
         f"<text x='{x2}' y='34' class='band'>PLAIN CODE</text>",
         f"<text x='{x3}' y='34' class='band'>YOU CHOOSE</text>",
-        f"<text x='{x4}' y='34' class='band'>CODE OR CLAUDE</text>",
+        f"<text x='{x4}' y='34' class='band'>CODE OR OPENAI</text>",
         f"<text x='{x5}' y='34' class='band'>YOU SEE</text>",
         _node(x1, mid, "data", "1", "A big list", [f"{n_models:,} AI models,", "from Epoch AI"], t),
         _node(x2, mid, "code", "2", "Tidy it up", ["fix typos, pick the", "main lab and topic"], t),
         _node(x3, mid, "you", "3", "Your filters", ["keep only the years", "and labs you pick"], t),
         _node(x4, top, "code", "4", "Draw pictures", ["charts, the race,", "costs, profiles"], t),
-        _node(x4, low - 20, "llm", "5", "Ask Claude", ["Claude picks one", "labelled drawer"], t),
+        _node(x4, low - 20, "llm", "5", "Ask OpenAI", ["OpenAI picks one", "labelled drawer"], t),
         _node(x5, mid, "you", "6", "Your answer", ["a chart, a table or", "a short answer"], t),
-        # the 9 drawers: the only things Claude can open
+        # the 9 drawers: the only things OpenAI can open
         f"<rect x='{x2 + 6}' y='{low + 4}' width='{NODE_W + 152}' height='76' rx='12' fill='{t['code-soft']}' "
         f"stroke='{t['code']}' stroke-width='1.3' stroke-dasharray='5 4'/>",
         f"<text x='{x2 + 22}' y='{low + 30}' class='title'>{len(QUERIES)} labelled drawers</text>",
-        f"<text x='{x2 + 22}' y='{low + 52}' class='sub'><tspan x='{x2 + 22}' dy='0'>Ready-made questions, like “top models”.</tspan><tspan x='{x2 + 22}' dy='15'>Claude can only open these; it never writes code.</tspan></text>",
+        f"<text x='{x2 + 22}' y='{low + 52}' class='sub'><tspan x='{x2 + 22}' dy='0'>Ready-made questions, like “top models”.</tspan><tspan x='{x2 + 22}' dy='15'>OpenAI can only open these; it never writes code.</tspan></text>",
         # arrows
         _edge(f"M{x1 + NODE_W},{mid + 46} L{x2 - 6},{mid + 46}"),
         _edge(f"M{x2 + NODE_W},{mid + 46} L{x3 - 6},{mid + 46}"),
@@ -91,7 +91,7 @@ def diagram_svg(n_models: int) -> str:
 def diagram_img(n_models: int) -> str:
     data = base64.b64encode(diagram_svg(n_models).encode("utf-8")).decode("ascii")
     alt = ("How the app works: 1, a big list of AI models from Epoch AI is downloaded; 2, plain code tidies it up; "
-           "3, your filters keep what you pick; then either 4, code draws charts, or 5, Claude picks one of nine "
+           "3, your filters keep what you pick; then either 4, code draws charts, or 5, OpenAI picks one of nine "
            "labelled query drawers, which code opens; 6, you see a chart, table or short answer.")
     return (f"<div class='diagram'><img src='data:image/svg+xml;base64,{data}' alt='{escape(alt)}' "
             f"style='width:100%;min-width:640px;height:auto;display:block'></div>")
@@ -99,10 +99,10 @@ def diagram_img(n_models: int) -> str:
 
 JOURNEY = [  # (who, what happens), the life of one "Ask the Data" question
     ("you", "You ask", "“Which labs built the most models since 2020?”"),
-    ("llm", "Claude reads the labels", "It sees the names of the 9 drawers and what each one is for. Not the data."),
-    ("llm", "Claude points at a drawer", "“Open count_by_org, with year_from = 2020.” That's all it can do."),
+    ("llm", "OpenAI reads the labels", "It sees the names of the 9 drawers and what each one is for. Not the data."),
+    ("llm", "OpenAI points at a drawer", "“Open count_by_org, with year_from = 2020.” That's all it can do."),
     ("code", "The app opens it", "Plain pandas code runs on your filtered list and gets a small table."),
-    ("llm", "Claude explains", "It turns the table into 2–3 sentences with the real numbers."),
+    ("llm", "OpenAI explains", "It turns the table into 2–3 sentences with the real numbers."),
 ]
 
 ROOMS = [  # (sidebar group, ELI5 line)
@@ -126,7 +126,7 @@ def eli5_page() -> None:
     st.markdown(
         "<div class='legend'><span><i style='background:var(--data)'></i>the data</span>"
         "<span><i style='background:var(--code)'></i>plain code: same input, same answer, every time</span>"
-        "<span><i style='background:var(--llm)'></i>Claude, the AI</span>"
+        "<span><i style='background:var(--llm)'></i>OpenAI, the model</span>"
         "<span><i style='background:var(--accent)'></i>you</span></div>", unsafe_allow_html=True)
     st.markdown(diagram_img(len(df)), unsafe_allow_html=True)
 
@@ -134,7 +134,7 @@ def eli5_page() -> None:
     steps = "".join(f"<div class='{who}'><span class='n'>{i}</span><b>{title}</b><span>{escape(what)}</span></div>"
                     for i, (who, title, what) in enumerate(JOURNEY, start=1))
     st.markdown(f"<div class='journey'>{steps}</div>", unsafe_allow_html=True)
-    st.markdown("<div class='callout'><b>Why the drawers?</b> If Claude could write its own code, a cleverly worded "
+    st.markdown("<div class='callout'><b>Why the drawers?</b> If OpenAI could write its own code, a cleverly worded "
                 "question could make the app do something nobody planned. With drawers, the worst it can do is open "
                 "the wrong one, and you can see which one it opened under every answer.</div>",
                 unsafe_allow_html=True)
@@ -151,7 +151,7 @@ def eli5_page() -> None:
         "AI's data, never made up. Each page says where the data came from.</span></div>"
         "<div class='code'><b>Code does the maths</b><span>Growth rates, rankings and costs are calculated by plain "
         "code, and tests check it gets known answers right.</span></div>"
-        "<div class='llm'><b>Claude only explains</b><span>It chooses a drawer and puts the result into words. You "
+        "<div class='llm'><b>OpenAI only explains</b><span>It chooses a drawer and puts the result into words. You "
         "can always open “How this was answered” to check.</span></div>"
         "</div>", unsafe_allow_html=True)
     st.markdown("")

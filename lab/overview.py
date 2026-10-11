@@ -115,13 +115,13 @@ FILES = [
     ("app.py", "code", "Registers the pages and the App / Overview / Lab navigation. No logic."),
     ("utils/data_loader.py", "data", "Loads and cleans the CSV (cached), derives primary org/domain and open status, applies filters."),
     ("utils/charts.py", "code", "Every Plotly chart: takes a DataFrame, returns a figure. Colours follow the site theme."),
-    ("utils/llm.py", "llm", "The nine safe query functions, their JSON schemas, and the Claude tool-use loop."),
+    ("utils/llm.py", "llm", "The nine safe query functions, their JSON schemas, and the OpenAI tool-use loop."),
     ("ui/filters.py", "code", "Sidebar filters shared by every data page; values persist across pages."),
     ("ui/theme.py · ui/chrome.py", "code", "Design tokens and CSS (same as the RAG and Travel Agent projects), author card, footer."),
     ("utils/insights.py", "code", "Model profiles, similar models, comparisons, the race frames and the live growth counter."),
     ("lab/", "code", "One module per page group: home, app and exploration pages, overview, the Explorer Lab, Surprise me."),
     ("scripts/download_data.py", "data", "Downloads the Epoch AI CSV (with a mirror fallback)."),
-    ("tests/", "code", "Offline tests: the growth fit and the tool-use loop with a fake Claude client."),
+    ("tests/", "code", "Offline tests: the growth fit and the tool-use loop with a fake OpenAI client."),
 ]
 
 
@@ -129,15 +129,15 @@ def about_page() -> None:
     df = base()["df_all"]
     st.title("How it's built")
     st.markdown("<div class='lede'>A small, layered Streamlit app: data in, cached and cleaned once; code computes every "
-                "number; Claude only chooses among predefined queries and writes the summary.</div>",
+                "number; OpenAI only chooses among predefined queries and writes the summary.</div>",
                 unsafe_allow_html=True)
 
     st.markdown("### The flow of one question")
     st.markdown(
         "<div class='steps'>"
         "<div class='data'><b>1 · Filtered data</b><span>The sidebar narrows the cached DataFrame. The same filtered "
-        "frame feeds every chart, table and Claude call.</span></div>"
-        "<div class='llm'><b>2 · Claude picks a tool</b><span>It sees nine function names, descriptions and JSON "
+        "frame feeds every chart, table and OpenAI call.</span></div>"
+        "<div class='llm'><b>2 · OpenAI picks a tool</b><span>It sees nine function names, descriptions and JSON "
         "schemas, and replies with one call such as <code>top_models_by_compute(n=5)</code>.</span></div>"
         "<div class='code'><b>3 · Code runs it</b><span>The app checks the name against a registry, drops unknown "
         "arguments, runs the pandas function and sends the rows back for a 2-3 sentence answer.</span></div>"
@@ -155,6 +155,6 @@ def about_page() -> None:
         f"Epoch AI's [Notable AI Models](https://epoch.ai/data/notable-ai-models): **{len(df):,} models**, "
         f"{df['year'].min()}–{df['year'].max()}. Parameters are missing for {null(PARAMS_COL)} of models, training "
         f"compute for {null(COMPUTE_COL)} and cost for {null(COST_COL)}, so each chart says how many models it had to "
-        f"leave out. Claude can call **{len(QUERIES)} query functions**: "
+        f"leave out. OpenAI can call **{len(QUERIES)} query functions**: "
         + ", ".join(f"`{name}`" for name in QUERIES) + ".")
     chrome.credit()

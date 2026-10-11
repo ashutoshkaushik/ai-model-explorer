@@ -256,7 +256,7 @@ def home_page() -> None:
         "date, organization, domain, parameters, training compute and cost.</span></div>"
         "<div class='code'><b>Code guarantees</b><span>Loading, cleaning, filters, the growth-rate fit and nine "
         "predefined query functions. Every number on screen comes from here.</span></div>"
-        "<div class='llm'><b>Claude explains</b><span>Picks which query function answers your question, then "
+        "<div class='llm'><b>OpenAI explains</b><span>Picks which query function answers your question, then "
         "summarizes the result. It never writes or runs code.</span></div>"
         "</div>", unsafe_allow_html=True)
 

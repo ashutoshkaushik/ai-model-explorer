@@ -168,7 +168,7 @@ NUGGETS = {  # key: [(tag, headline, body)], 4 per Lab page
          "Every tool schema here forbids unknown keys, and <code>run_query</code> drops them anyway. Two layers, "
          "because a schema is a request to the model, not a guarantee."),
         ("Prompting", "Descriptions are prompts",
-         "Claude picks tools by reading their names and descriptions. Short, specific descriptions with an example "
+         "OpenAI picks tools by reading their names and descriptions. Short, specific descriptions with an example "
          "(\"e.g. 'GPT-4'\") choose better than long ones."),
     ],
     "lab_environment": [
@@ -372,7 +372,7 @@ def lab_milestones() -> None:
 def lab_tools() -> None:
     df = base()["df_all"]
     header(6, "Ask the Data with safe tool use",
-           "Claude never writes code here. It chooses one of nine registered functions and fills in arguments that "
+           "OpenAI never writes code here. It chooses one of nine registered functions and fills in arguments that "
            "match a JSON schema; the app runs the function.")
     st.markdown("### Run a tool yourself (no API call)")
     name = st.selectbox("Function", list(QUERIES), key="lab_tool_name")
@@ -399,21 +399,21 @@ def lab_tools() -> None:
         st.dataframe(run_query(df, name, call), hide_index=True, width="stretch")
     except Exception as e:  # same as the real loop: report, don't crash
         st.error(f"Error: {e}")
-    with st.expander("What Claude sees for this tool", icon=":material/data_object:"):
+    with st.expander("What OpenAI sees for this tool", icon=":material/data_object:"):
         st.json(next(t for t in TOOLS if t["name"] == name))
     chrome.credit()
     key_code("lab_tools")
     learn(
-        ["The tool-use loop: Claude asks, code runs, Claude answers", "Why a registry beats generated code"],
+        ["The tool-use loop: OpenAI asks, code runs, OpenAI answers", "Why a registry beats generated code"],
         ["**The registry is the security boundary.** `run_query` rejects unknown names and drops any argument not in "
          "the schema, so the worst a confused model can do is ask for the wrong table.",
-         "**Errors go back to Claude as data** (`is_error: true`) instead of crashing, so it can retry with "
+         "**Errors go back to OpenAI as data** instead of crashing, so it can retry with "
          "different arguments.",
          "**Capped at three rounds,** and results are trimmed to 60 rows before they're sent, which keeps cost and "
          "latency predictable.",
          "**Tested without the API.** `tests/test_llm.py` drives the loop with a fake client that replays scripted "
          "tool calls."],
-        [("Why not let Claude write pandas code? It would answer more questions.",
+        [("Why not let OpenAI write pandas code? It would answer more questions.",
           "Executing model-written code means anything in a prompt can become code on your server. Nine functions "
           "cover the questions people actually ask; new capabilities are added to `QUERIES` deliberately.")],
     )

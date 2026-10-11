@@ -37,7 +37,7 @@ def footer() -> None:
     """Page footer, kept at the bottom of the window (see .site-footer in ui/theme.py). On phones only the
     data credit shows, so it stays one line."""
     st.markdown(
-        "<div class='site-footer'><span class='sf-long'>Built with Streamlit, Plotly and Claude, using Claude Code "
-        "and other AI tools, with a human in the loop. </span>"
+        "<div class='site-footer'><span class='sf-long'>Built with Streamlit, Plotly and OpenAI, with a human in the "
+        "loop. </span>"
         f"{CREDIT}: <a href='https://epoch.ai/data/notable-ai-models' target='_blank' rel='noopener noreferrer'>"
         "Notable AI Models</a></div>", unsafe_allow_html=True)

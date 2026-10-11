@@ -1,4 +1,4 @@
-"""App pages: the Explorer (charts) and Ask the Data (Claude tool use)."""
+"""App pages: the Explorer (charts) and Ask the Data (OpenAI tool use)."""
 
 import json
 
@@ -92,15 +92,15 @@ def ask_page() -> None:
     df = f.df
     st.title("Ask the Data")
     st.markdown(
-        "<div class='lede'>Ask in plain English. <span class='badge llm'>Claude</span> picks one of nine safe query "
-        "functions, <span class='badge code'>code</span> runs it on the filtered data, and Claude summarizes the "
+        "<div class='lede'>Ask in plain English. <span class='badge llm'>OpenAI</span> picks one of nine safe query "
+        "functions, <span class='badge code'>code</span> runs it on the filtered data, and OpenAI summarizes the "
         "result. No generated code is ever executed.</div>", unsafe_allow_html=True)
     if df.empty:
         empty_message()
         return
     client = get_client()
     if client is None:
-        st.info("Add `ANTHROPIC_API_KEY` to `.streamlit/secrets.toml` (see `secrets.toml.example`), or to the app's "
+        st.info("Add `OPENAI_API_KEY` to `.streamlit/secrets.toml` (see `secrets.toml.example`), or to the app's "
                 "secrets on Streamlit Community Cloud, to enable questions and era summaries.", icon=":material/key:")
         chrome.credit()
         return
@@ -114,7 +114,7 @@ def ask_page() -> None:
         submitted = st.form_submit_button("Ask", type="primary", icon=":material/send:")
     if (submitted or st.session_state.pop("ask_submit", False)) and question.strip():
         try:
-            with st.spinner("Asking Claude…"):
+            with st.spinner("Asking OpenAI…"):
                 st.session_state["ask_result"] = (question, ask(client, df, question, f.note))
         except LLMError as e:
             st.error(str(e))
@@ -125,7 +125,7 @@ def ask_page() -> None:
             st.markdown(result.answer)
         with st.expander(f"How this was answered ({len(result.calls)} function call(s))", icon=":material/code:"):
             if not result.calls:
-                st.caption("Claude answered without calling a query function.")
+                st.caption("OpenAI answered without calling a query function.")
             for call in result.calls:
                 st.code(f"{call.name}({json.dumps(call.args)})", language="python")
                 if call.error:

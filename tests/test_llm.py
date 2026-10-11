@@ -62,11 +62,11 @@ def test_growth_rate_insufficient_data():
 
 
 class FakeClient:
-    """Returns scripted responses from client.beta.messages.create and records requests."""
+    """Returns scripted responses from client.chat.completions.create and records requests."""
 
     def __init__(self, responses):
         self.responses, self.requests = list(responses), []
-        self.beta = NS(messages=NS(create=self._create))
+        self.chat = NS(completions=NS(create=self._create))
 
     def _create(self, **kwargs):
         self.requests.append(kwargs)
@@ -75,13 +75,30 @@ class FakeClient:
 
 def test_ask_tool_loop():
     tool_turn = NS(
-        stop_reason="tool_use",
-        content=[
-            NS(type="thinking", thinking=""),
-            NS(type="tool_use", id="tu_1", name="top_models_by_compute", input={"n": 2}),
-        ],
+        choices=[
+            NS(
+                finish_reason="tool_calls",
+                message=NS(
+                    content=None,
+                    refusal=None,
+                    tool_calls=[
+                        NS(
+                            id="tu_1",
+                            function=NS(name="top_models_by_compute", arguments='{"n": 2}'),
+                        )
+                    ],
+                ),
+            )
+        ]
     )
-    final = NS(stop_reason="end_turn", content=[NS(type="text", text="GPT-6 Astra leads with 1e27 FLOP.")])
+    final = NS(
+        choices=[
+            NS(
+                finish_reason="stop",
+                message=NS(content="GPT-6 Astra leads with 1e27 FLOP.", refusal=None, tool_calls=None),
+            )
+        ]
+    )
     client = FakeClient([tool_turn, final])
     result = llm.ask(client, DF, "largest?", "years 1950-2026")
 
@@ -89,28 +106,52 @@ def test_ask_tool_loop():
     assert [c.name for c in result.calls] == ["top_models_by_compute"]
     assert len(result.calls[0].result) == 2
     first, second = client.requests
-    assert first["model"] == llm.MODEL and first["fallbacks"] == "default"
-    assert {t["name"] for t in first["tools"]} == set(llm.QUERIES)
-    # Assistant turn echoed unchanged (incl. thinking), then one user turn with the tool result.
-    assert second["messages"][1]["content"] is tool_turn.content
-    tr = second["messages"][2]["content"][0]
-    assert tr["type"] == "tool_result" and tr["tool_use_id"] == "tu_1" and not tr["is_error"]
+    assert first["model"] == llm.MODEL and first["tool_choice"] == "auto"
+    assert {t["function"]["name"] for t in first["tools"]} == set(llm.QUERIES)
+    assistant_turn, tool_result = second["messages"][2:]
+    assert assistant_turn["role"] == "assistant"
+    assert assistant_turn["tool_calls"][0]["id"] == "tu_1"
+    assert tool_result["role"] == "tool" and tool_result["tool_call_id"] == "tu_1"
 
 
 def test_ask_bad_tool_args_reported_not_raised():
-    bad = NS(stop_reason="tool_use", content=[NS(type="tool_use", id="tu_1", name="nope", input={})])
-    final = NS(stop_reason="end_turn", content=[NS(type="text", text="Sorry.")])
+    bad = NS(
+        choices=[
+            NS(
+                finish_reason="tool_calls",
+                message=NS(
+                    content=None,
+                    refusal=None,
+                    tool_calls=[
+                        NS(id="tu_1", function=NS(name="nope", arguments="{}"))
+                    ],
+                ),
+            )
+        ]
+    )
+    final = NS(
+        choices=[NS(finish_reason="stop", message=NS(content="Sorry.", refusal=None, tool_calls=None))]
+    )
     client = FakeClient([bad, final])
     result = llm.ask(client, DF, "q", "")
-    assert result.calls[0].error and client.requests[1]["messages"][2]["content"][0]["is_error"]
+    assert result.calls[0].error and client.requests[1]["messages"][3]["role"] == "tool"
 
 
 def test_refusal_is_friendly_error():
-    client = FakeClient([NS(stop_reason="refusal", content=[])])
+    response = NS(
+        choices=[
+            NS(
+                finish_reason="stop",
+                message=NS(content=None, refusal="I can't help with that.", tool_calls=None),
+            )
+        ]
+    )
+    client = FakeClient([response])
     try:
         llm.ask(client, DF, "q", "")
         raise AssertionError("expected LLMError")
-    except llm.LLMError:
+    except llm.LLMError as e:
+        assert "OpenAI declined" in str(e)
         pass
 
 

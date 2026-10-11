@@ -6,7 +6,7 @@ refers to them as var(--token). Charts read the same tokens through chart_tokens
 Colour tokens have fixed meanings:
   --accent    terracotta: buttons, links and the active nav item ONLY
   --data      the dataset / measured facts
-  --llm       Claude decides (Ask the Data, era summaries)
+  --llm       OpenAI decides (Ask the Data, era summaries)
   --code      code guarantees (query functions, filters, the growth fit)
 """
 
@@ -156,7 +156,7 @@ def apply_theme() -> None:
   .rung.this .n {{ color: var(--accent); }}
   .rung .here {{ position: absolute; top: .55rem; right: .6rem; }}
 
-  /* ---- Who does what: data / code / Claude */
+  /* ---- Who does what: data / code / OpenAI */
   .steps {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }}
   @media (max-width: 1000px) {{ .steps {{ grid-template-columns: 1fr; }} }}
   .steps > div {{ padding-top: .5rem; }}

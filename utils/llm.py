@@ -1,8 +1,8 @@
-"""Claude-powered "Ask the Data" and era summaries.
+"""OpenAI-powered "Ask the Data" and era summaries.
 
-Claude never writes or runs code here. It picks one of a fixed set of safe query functions via
-tool use; we run that function on the (already filtered) DataFrame and hand the result back for
-Claude to summarize. The API key comes from st.secrets (or the environment) and is never hardcoded.
+The model never writes or runs code here. It picks one of a fixed set of safe query functions via
+tool calls; we run that function on the (already filtered) DataFrame and hand the result back for
+the model to summarize. The API key comes from st.secrets (or the environment) and is never hardcoded.
 """
 
 import json
@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-import anthropic
+import openai
 import pandas as pd
 import streamlit as st
 
@@ -26,10 +26,7 @@ from utils.data_loader import (
     PARAMS_COL,
 )
 
-MODEL = "claude-opus-5"
-# Server-side fallback: if a request is declined by a safety classifier, the API retries it on
-# Anthropic's recommended fallback model instead of returning a refusal.
-BETAS = ["server-side-fallback-2026-07-01"]
+MODEL = "gpt-4o-mini"
 MAX_TOOL_ROUNDS = 3
 MAX_RESULT_ROWS = 60
 
@@ -40,14 +37,14 @@ class LLMError(Exception):
 
 def _api_key() -> str | None:
     try:
-        return st.secrets["ANTHROPIC_API_KEY"]
+        return st.secrets["OPENAI_API_KEY"]
     except (KeyError, FileNotFoundError, st.errors.StreamlitSecretNotFoundError):
-        return os.getenv("ANTHROPIC_API_KEY")
+        return os.getenv("OPENAI_API_KEY")
 
 
-def get_client() -> anthropic.Anthropic | None:
+def get_client() -> openai.OpenAI | None:
     key = _api_key()
-    return anthropic.Anthropic(api_key=key) if key else None
+    return openai.OpenAI(api_key=key) if key else None
 
 
 # --- Safe query functions --------------------------------------------------------------------
@@ -214,7 +211,13 @@ QUERIES: dict[str, tuple[Callable[..., pd.DataFrame], str, dict]] = {
     ),
 }
 
-TOOLS = [{"name": name, "description": desc, "input_schema": schema} for name, (_, desc, schema) in QUERIES.items()]
+TOOLS = [
+    {
+        "type": "function",
+        "function": {"name": name, "description": desc, "parameters": schema},
+    }
+    for name, (_, desc, schema) in QUERIES.items()
+]
 
 
 def run_query(df: pd.DataFrame, name: str, args: dict[str, Any]) -> pd.DataFrame:
@@ -226,7 +229,7 @@ def run_query(df: pd.DataFrame, name: str, args: dict[str, Any]) -> pd.DataFrame
     return func(df, **{k: v for k, v in args.items() if k in allowed and v is not None})
 
 
-# --- Claude calls ----------------------------------------------------------------------------
+# --- OpenAI calls -----------------------------------------------------------------------------
 
 
 @dataclass
@@ -250,32 +253,29 @@ Then answer in 2-3 sentences using specific numbers from the tool results. Use o
 tool results; if the data can't answer the question, say so briefly. No preamble, no markdown headers."""
 
 
-def _create(client: anthropic.Anthropic, **kwargs):
+def _create(client: openai.OpenAI, **kwargs):
     try:
-        response = client.beta.messages.create(
+        response = client.chat.completions.create(
             model=MODEL,
-            betas=BETAS,
-            fallbacks="default",
-            output_config={"effort": "low"},
             **kwargs,
         )
-    except anthropic.AuthenticationError:
-        raise LLMError("The Anthropic API key was rejected. Check ANTHROPIC_API_KEY in .streamlit/secrets.toml.")
-    except anthropic.PermissionDeniedError:
+    except openai.AuthenticationError:
+        raise LLMError("OpenAI rejected the API key. Check OPENAI_API_KEY in .streamlit/secrets.toml.")
+    except openai.PermissionDeniedError:
         raise LLMError("This API key doesn't have access to the model.")
-    except anthropic.RateLimitError:
-        raise LLMError("Rate limited by the Anthropic API. Wait a moment and try again.")
-    except anthropic.APIConnectionError:
-        raise LLMError("Couldn't reach the Anthropic API. Check your internet connection.")
-    except anthropic.APIStatusError as e:
-        raise LLMError(f"The Anthropic API returned an error ({e.status_code}). Please try again.")
-    if response.stop_reason == "refusal":
-        raise LLMError("Claude declined to answer this request.")
+    except openai.RateLimitError:
+        raise LLMError("Rate limited by the OpenAI API. Wait a moment and try again.")
+    except openai.APIConnectionError:
+        raise LLMError("Couldn't reach the OpenAI API. Check your internet connection.")
+    except openai.APIStatusError as e:
+        raise LLMError(f"The OpenAI API returned an error ({e.status_code}). Please try again.")
+    if response.choices[0].message.refusal:
+        raise LLMError("OpenAI declined to answer this request.")
     return response
 
 
 def _text(response) -> str:
-    return "\n".join(b.text for b in response.content if b.type == "text").strip()
+    return (response.choices[0].message.content or "").strip()
 
 
 def _result_payload(table: pd.DataFrame) -> str:
@@ -284,28 +284,60 @@ def _result_payload(table: pd.DataFrame) -> str:
     return f"{len(table)} rows\n{csv}{note}"
 
 
-def ask(client: anthropic.Anthropic, df: pd.DataFrame, question: str, filter_note: str) -> AskResult:
-    messages: list[dict] = [{"role": "user", "content": f"Current filters: {filter_note}\n\nQuestion: {question}"}]
+def ask(client: openai.OpenAI, df: pd.DataFrame, question: str, filter_note: str) -> AskResult:
+    messages: list[dict] = [
+        {"role": "system", "content": ASK_SYSTEM},
+        {"role": "user", "content": f"Current filters: {filter_note}\n\nQuestion: {question}"},
+    ]
     calls: list[ToolCall] = []
     for _ in range(MAX_TOOL_ROUNDS + 1):
-        response = _create(client, max_tokens=4000, system=ASK_SYSTEM, tools=TOOLS, messages=messages)
-        tool_uses = [b for b in response.content if b.type == "tool_use"]
-        if response.stop_reason != "tool_use" or not tool_uses or len(calls) >= MAX_TOOL_ROUNDS:
-            return AskResult(_text(response) or "Claude didn't return an answer.", calls)
-        messages.append({"role": "assistant", "content": response.content})
-        results = []
-        for block in tool_uses:
-            call = ToolCall(block.name, dict(block.input))
+        response = _create(
+            client,
+            max_tokens=4000,
+            tools=TOOLS,
+            tool_choice="auto",
+            messages=messages,
+        )
+        message = response.choices[0].message
+        tool_calls = message.tool_calls or []
+        if response.choices[0].finish_reason != "tool_calls" or not tool_calls or len(calls) >= MAX_TOOL_ROUNDS:
+            return AskResult(_text(response) or "OpenAI didn't return an answer.", calls)
+        messages.append(
+            {
+                "role": "assistant",
+                "content": message.content,
+                "tool_calls": [
+                    {
+                        "id": block.id,
+                        "type": "function",
+                        "function": {
+                            "name": block.function.name,
+                            "arguments": block.function.arguments,
+                        },
+                    }
+                    for block in tool_calls
+                ],
+            }
+        )
+        for block in tool_calls:
             try:
-                call.result = run_query(df, block.name, call.args)
-                content, is_error = _result_payload(call.result), False
+                args = json.loads(block.function.arguments)
+                if not isinstance(args, dict):
+                    raise ValueError("Tool arguments must be a JSON object.")
+                call = ToolCall(block.function.name, args)
+            except (json.JSONDecodeError, ValueError) as e:
+                call = ToolCall(block.function.name, {}, error=str(e))
+            try:
+                if call.error:
+                    raise ValueError(call.error)
+                call.result = run_query(df, call.name, call.args)
+                content = _result_payload(call.result)
             except Exception as e:  # bad args from the model: report back instead of crashing
                 call.error = str(e)
-                content, is_error = f"Error: {e}", True
+                content = f"Error: {e}"
             calls.append(call)
-            results.append({"type": "tool_result", "tool_use_id": block.id, "content": content, "is_error": is_error})
-        messages.append({"role": "user", "content": results})
-    return AskResult("Claude didn't return an answer.", calls)
+            messages.append({"role": "tool", "tool_call_id": block.id, "content": content})
+    return AskResult("OpenAI didn't return an answer.", calls)
 
 
 def era_stats(df: pd.DataFrame, years: tuple[int, int]) -> dict[str, Any]:
@@ -336,16 +368,16 @@ of what characterized that period in AI. Weave in the specific numbers and model
 You may add widely known historical context, but never invent statistics. Plain prose, no headers or lists."""
 
 
-def era_summary(client: anthropic.Anthropic, stats: dict[str, Any], filter_note: str) -> str:
+def era_summary(client: openai.OpenAI, stats: dict[str, Any], filter_note: str) -> str:
     response = _create(
         client,
         max_tokens=2000,
-        system=ERA_SYSTEM,
         messages=[
+            {"role": "system", "content": ERA_SYSTEM},
             {
                 "role": "user",
                 "content": f"Filters: {filter_note}\n\nStats:\n{json.dumps(stats, indent=1, default=str)}",
             }
         ],
     )
-    return _text(response) or "Claude didn't return a summary."
+    return _text(response) or "OpenAI didn't return a summary."

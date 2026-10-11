@@ -36,7 +36,7 @@ def sci_compact(x: float) -> str:
 class Filtered:
     df: pd.DataFrame          # sidebar-filtered models
     years: tuple[int, int]
-    note: str                 # plain-English filter summary, sent to Claude with every question
+    note: str                 # plain-English filter summary, sent to OpenAI with every question
 
 
 def base() -> dict:
